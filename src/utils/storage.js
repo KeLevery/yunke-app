@@ -1,0 +1,121 @@
+const STORAGE_KEY = 'timetable_data'
+const HISTORY_KEY = 'timetable_history'
+const PERIODS_KEY = 'timetable_periods'
+const SEMESTER_START_KEY = 'timetable_semester_start'
+
+// ========== 课程数据 ==========
+
+export function loadCourses() {
+  try {
+    const data = localStorage.getItem(STORAGE_KEY)
+    return data ? JSON.parse(data) : null
+  } catch {
+    return null
+  }
+}
+
+export function saveCourses(courses) {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(courses))
+}
+
+export function addCourse(course) {
+  const courses = loadCourses() || []
+  course.id = Date.now().toString(36) + Math.random().toString(36).slice(2, 6)
+  courses.push(course)
+  saveCourses(courses)
+  // 记录历史
+  if (course.name) addHistoryItem('name', course.name)
+  if (course.location) addHistoryItem('location', course.location)
+  if (course.teacher) addHistoryItem('teacher', course.teacher)
+  return course
+}
+
+export function updateCourse(id, data) {
+  const courses = loadCourses() || []
+  const index = courses.findIndex(c => c.id === id)
+  if (index !== -1) {
+    courses[index] = { ...courses[index], ...data }
+    saveCourses(courses)
+    // 记录历史
+    if (data.name) addHistoryItem('name', data.name)
+    if (data.location) addHistoryItem('location', data.location)
+    if (data.teacher) addHistoryItem('teacher', data.teacher)
+    return courses[index]
+  }
+  return null
+}
+
+export function deleteCourse(id) {
+  const courses = loadCourses() || []
+  const filtered = courses.filter(c => c.id !== id)
+  saveCourses(filtered)
+  return filtered
+}
+
+export function getCourseById(id) {
+  const courses = loadCourses() || []
+  return courses.find(c => c.id === id) || null
+}
+
+export function generateId() {
+  return Date.now().toString(36) + Math.random().toString(36).slice(2, 6)
+}
+
+// ========== 历史记录 ==========
+
+export function loadHistory() {
+  try {
+    const data = localStorage.getItem(HISTORY_KEY)
+    return data ? JSON.parse(data) : { location: [], teacher: [] }
+  } catch {
+    return { location: [], teacher: [] }
+  }
+}
+
+function saveHistory(history) {
+  localStorage.setItem(HISTORY_KEY, JSON.stringify(history))
+}
+
+export function addHistoryItem(type, value) {
+  if (!value || !value.trim()) return
+  const history = loadHistory()
+  const list = history[type] || []
+  // 去重并放到最前面
+  const idx = list.indexOf(value.trim())
+  if (idx !== -1) list.splice(idx, 1)
+  list.unshift(value.trim())
+  // 最多保留 20 条
+  if (list.length > 20) list.pop()
+  history[type] = list
+  saveHistory(history)
+}
+
+export function getHistory(type) {
+  const history = loadHistory()
+  return history[type] || []
+}
+
+// ========== 自定义节次时间 ==========
+
+export function loadPeriods() {
+  try {
+    const data = localStorage.getItem(PERIODS_KEY)
+    return data ? JSON.parse(data) : null
+  } catch {
+    return null
+  }
+}
+
+export function savePeriods(periods) {
+  localStorage.setItem(PERIODS_KEY, JSON.stringify(periods))
+}
+
+// ========== 学期开始日期 ==========
+
+export function loadSemesterStart() {
+  return localStorage.getItem(SEMESTER_START_KEY) || ''
+}
+
+export function saveSemesterStart(dateStr) {
+  localStorage.setItem(SEMESTER_START_KEY, dateStr)
+}

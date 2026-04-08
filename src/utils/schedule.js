@@ -1,0 +1,211 @@
+// 每节课的时间配置（可自定义）
+export const DEFAULT_PERIODS = [
+  { period: 1,  start: '08:00', end: '08:45' },
+  { period: 2,  start: '08:55', end: '09:40' },
+  { period: 3,  start: '10:00', end: '10:45' },
+  { period: 4,  start: '10:55', end: '11:40' },
+  { period: 5,  start: '14:00', end: '14:45' },
+  { period: 6,  start: '14:55', end: '15:40' },
+  { period: 7,  start: '16:00', end: '16:45' },
+  { period: 8,  start: '16:55', end: '17:40' },
+  { period: 9,  start: '19:00', end: '19:45' },
+  { period: 10, start: '19:55', end: '20:40' },
+  { period: 11, start: '20:50', end: '21:35' },
+  { period: 12, start: '21:45', end: '22:30' }
+]
+
+// 星期标签
+export const WEEK_DAYS = ['周一', '周二', '周三', '周四', '周五', '周六', '周日']
+
+// 更多课程颜色
+export const COURSE_COLORS = [
+  { name: '天蓝',   value: '#4A90D9' },
+  { name: '海蓝',   value: '#2980B9' },
+  { name: '靛青',   value: '#1A5276' },
+  { name: '薄荷',   value: '#27AE60' },
+  { name: '翠绿',   value: '#1E8449' },
+  { name: '青瓷',   value: '#1ABC9C' },
+  { name: '松石',   value: '#17A589' },
+  { name: '珊瑚',   value: '#E74C3C' },
+  { name: '玫红',   value: '#C0392B' },
+  { name: '樱粉',   value: '#E91E8C' },
+  { name: '琥珀',   value: '#F39C12' },
+  { name: '橘橙',   value: '#E67E22' },
+  { name: '紫藤',   value: '#8E44AD' },
+  { name: '薰衣草', value: '#7D3C98' },
+  { name: '墨灰',   value: '#5D6D7E' },
+  { name: '棕褐',   value: '#8B6914' }
+]
+
+// 示例数据
+export const SAMPLE_DATA = [
+  {
+    id: 'sample1',
+    name: '高等数学',
+    location: '教学楼A-301',
+    teacher: '张教授',
+    dayOfWeek: 1,
+    startPeriod: 1,
+    endPeriod: 2,
+    weeks: [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16],
+    color: '#4A90D9'
+  },
+  {
+    id: 'sample2',
+    name: '大学英语',
+    location: '外语楼B-205',
+    teacher: '李老师',
+    dayOfWeek: 2,
+    startPeriod: 3,
+    endPeriod: 4,
+    weeks: [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16],
+    color: '#27AE60'
+  },
+  {
+    id: 'sample3',
+    name: '数据结构',
+    location: '计算机楼C-102',
+    teacher: '王教授',
+    dayOfWeek: 3,
+    startPeriod: 5,
+    endPeriod: 6,
+    weeks: [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16],
+    color: '#F39C12'
+  },
+  {
+    id: 'sample4',
+    name: '线性代数',
+    location: '教学楼A-401',
+    teacher: '赵老师',
+    dayOfWeek: 4,
+    startPeriod: 1,
+    endPeriod: 2,
+    weeks: [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16],
+    color: '#8E44AD'
+  },
+  {
+    id: 'sample5',
+    name: '体育',
+    location: '体育馆',
+    teacher: '陈教练',
+    dayOfWeek: 5,
+    startPeriod: 3,
+    endPeriod: 4,
+    weeks: [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16],
+    color: '#1ABC9C'
+  },
+  {
+    id: 'sample6',
+    name: 'Python编程',
+    location: '计算机楼C-301',
+    teacher: '刘教授',
+    dayOfWeek: 1,
+    startPeriod: 5,
+    endPeriod: 6,
+    weeks: [1,2,3,4,5,6,7,8],
+    color: '#E74C3C'
+  },
+  {
+    id: 'sample7',
+    name: '马克思主义基本原理',
+    location: '教学楼D-101',
+    teacher: '孙老师',
+    dayOfWeek: 3,
+    startPeriod: 1,
+    endPeriod: 2,
+    weeks: [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16],
+    color: '#5D6D7E'
+  },
+  {
+    id: 'sample8',
+    name: '大学物理实验',
+    location: '物理实验楼E-201',
+    teacher: '周教授',
+    dayOfWeek: 5,
+    startPeriod: 5,
+    endPeriod: 7,
+    weeks: [1,2,3,4,5,6,7,8,9,10,11,12],
+    color: '#E91E8C'
+  }
+]
+
+/**
+ * 获取指定周数的课程
+ */
+export function getCoursesForWeek(courses, weekNumber) {
+  return courses.filter(course => course.weeks && course.weeks.includes(weekNumber))
+}
+
+/**
+ * 获取指定某一天的课程
+ */
+export function getCoursesForDay(courses, weekNumber, dayOfWeek) {
+  return getCoursesForWeek(courses, weekNumber)
+    .filter(c => c.dayOfWeek === dayOfWeek)
+    .sort((a, b) => a.startPeriod - b.startPeriod)
+}
+
+/**
+ * 获取学期开始日期（优先从 localStorage 读取）
+ */
+function getSemesterStartDate() {
+  const saved = localStorage.getItem('timetable_semester_start')
+  if (saved) {
+    const d = new Date(saved)
+    if (!isNaN(d.getTime())) return d
+  }
+  return null
+}
+
+/**
+ * 获取默认的学期开始日期（根据当前月份推测）
+ */
+function getDefaultSemesterStart() {
+  const now = new Date()
+  const year = now.getFullYear()
+  const month = now.getMonth() + 1
+  if (month >= 9) {
+    return new Date(year, 8, 1)
+  } else if (month >= 2) {
+    return new Date(year, 1, 20)
+  } else {
+    return new Date(year - 1, 8, 1)
+  }
+}
+
+/**
+ * 获取当前是第几周
+ */
+export function getCurrentWeekNumber() {
+  const semesterStart = getSemesterStartDate() || getDefaultSemesterStart()
+  const now = new Date()
+  // 找到学期开始的那个周一
+  const startDay = semesterStart.getDay() || 7
+  const monday = new Date(semesterStart)
+  monday.setDate(semesterStart.getDate() - startDay + 1)
+  const diff = now.getTime() - monday.getTime()
+  const weekNum = Math.floor(diff / (7 * 24 * 60 * 60 * 1000)) + 1
+  return Math.max(1, Math.min(weekNum, 25))
+}
+
+/**
+ * 获取指定周的日期范围
+ */
+export function getWeekDateRange(weekNumber) {
+  const semesterStart = getSemesterStartDate() || getDefaultSemesterStart()
+  const startDay = semesterStart.getDay() || 7
+  const firstMonday = new Date(semesterStart)
+  firstMonday.setDate(semesterStart.getDate() - startDay + 1)
+  const monday = new Date(firstMonday)
+  monday.setDate(firstMonday.getDate() + (weekNumber - 1) * 7)
+  const sunday = new Date(monday)
+  sunday.setDate(monday.getDate() + 6)
+  return { monday, sunday }
+}
+
+/**
+ * 格式化日期为 M.D 格式
+ */
+export function formatDate(date) {
+  return `${date.getMonth() + 1}.${date.getDate()}`
+}

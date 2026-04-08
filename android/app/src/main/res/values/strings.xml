@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">云课</string>
+    <string name="title_activity_main">云课</string>
+    <string name="package_name">com.yunke.app</string>
+    <string name="custom_url_scheme">com.yunke.app</string>
+</resources>
