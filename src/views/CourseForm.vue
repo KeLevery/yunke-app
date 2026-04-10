@@ -87,8 +87,9 @@ function updatePeriodTime(index, field, value) {
 }
 
 function save() {
-  if (!form.value.name.trim()) return
   const data = { ...form.value }
+  // 名称如果为空则显示默认名称
+  if (!data.name.trim()) data.name = '未命名课程'
   if (isEdit.value) {
     updateCourse(editId.value, data)
   } else {
@@ -107,7 +108,7 @@ function doDelete() {
 
 function goBack() { router.back() }
 
-const isFormValid = computed(() => form.value.name.trim() && form.value.weeks.length > 0)
+const isFormValid = computed(() => form.value.weeks.length > 0)
 
 // ========== 历史选择弹窗 ==========
 const showHistoryModal = ref(false)
@@ -164,9 +165,9 @@ const hasHistory = (field) => (history.value[field] || []).length > 0
     <div class="course-form__body">
       <!-- 课程名称 -->
       <div class="form-group">
-        <label class="form-label">课程名称</label>
+        <label class="form-label">课程名称 <span class="form-optional">选填</span></label>
         <div class="form-input-wrap">
-          <input v-model="form.name" class="form-input" type="text" placeholder="如：高等数学" maxlength="20" />
+          <input v-model="form.name" class="form-input" type="text" placeholder="如：高等数学（不填则默认未命名课程）" maxlength="20" />
           <button v-if="hasHistory('name')" class="form-input__picker" @click="openHistoryPicker('name')">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
           </button>
@@ -175,7 +176,7 @@ const hasHistory = (field) => (history.value[field] || []).length > 0
 
       <!-- 上课地点 -->
       <div class="form-group">
-        <label class="form-label">上课地点</label>
+        <label class="form-label">上课地点 <span class="form-optional">选填</span></label>
         <div class="form-input-wrap">
           <input v-model="form.location" class="form-input" type="text" placeholder="如：教学楼A-301" maxlength="30" />
           <button v-if="hasHistory('location')" class="form-input__picker" @click="openHistoryPicker('location')">
@@ -186,7 +187,7 @@ const hasHistory = (field) => (history.value[field] || []).length > 0
 
       <!-- 任课教师 -->
       <div class="form-group">
-        <label class="form-label">任课教师</label>
+        <label class="form-label">任课教师 <span class="form-optional">选填</span></label>
         <div class="form-input-wrap">
           <input v-model="form.teacher" class="form-input" type="text" placeholder="如：张教授" maxlength="20" />
           <button v-if="hasHistory('teacher')" class="form-input__picker" @click="openHistoryPicker('teacher')">
@@ -438,6 +439,12 @@ const hasHistory = (field) => (history.value[field] || []).length > 0
   font-weight: 600;
   color: var(--text-secondary);
   padding-left: 2px;
+}
+
+.form-optional {
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--text-tertiary);
 }
 
 .form-label-row {

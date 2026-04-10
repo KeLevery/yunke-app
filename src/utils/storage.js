@@ -2,6 +2,7 @@ const STORAGE_KEY = 'timetable_data'
 const HISTORY_KEY = 'timetable_history'
 const PERIODS_KEY = 'timetable_periods'
 const SEMESTER_START_KEY = 'timetable_semester_start'
+const CELL_HEIGHT_KEY = 'timetable_cell_height'
 
 // ========== 课程数据 ==========
 
@@ -23,10 +24,10 @@ export function addCourse(course) {
   course.id = Date.now().toString(36) + Math.random().toString(36).slice(2, 6)
   courses.push(course)
   saveCourses(courses)
-  // 记录历史
-  if (course.name) addHistoryItem('name', course.name)
-  if (course.location) addHistoryItem('location', course.location)
-  if (course.teacher) addHistoryItem('teacher', course.teacher)
+  // 记录历史（仅非空值）
+  if (course.name && course.name.trim() && course.name !== '未命名课程') addHistoryItem('name', course.name)
+  if (course.location && course.location.trim()) addHistoryItem('location', course.location)
+  if (course.teacher && course.teacher.trim()) addHistoryItem('teacher', course.teacher)
   return course
 }
 
@@ -36,10 +37,10 @@ export function updateCourse(id, data) {
   if (index !== -1) {
     courses[index] = { ...courses[index], ...data }
     saveCourses(courses)
-    // 记录历史
-    if (data.name) addHistoryItem('name', data.name)
-    if (data.location) addHistoryItem('location', data.location)
-    if (data.teacher) addHistoryItem('teacher', data.teacher)
+    // 记录历史（仅非空值）
+    if (data.name && data.name.trim() && data.name !== '未命名课程') addHistoryItem('name', data.name)
+    if (data.location && data.location.trim()) addHistoryItem('location', data.location)
+    if (data.teacher && data.teacher.trim()) addHistoryItem('teacher', data.teacher)
     return courses[index]
   }
   return null
@@ -118,4 +119,15 @@ export function loadSemesterStart() {
 
 export function saveSemesterStart(dateStr) {
   localStorage.setItem(SEMESTER_START_KEY, dateStr)
+}
+
+// ========== 单元格高度 ==========
+
+export function loadCellHeight() {
+  const val = localStorage.getItem(CELL_HEIGHT_KEY)
+  return val ? parseInt(val) : null
+}
+
+export function saveCellHeight(height) {
+  localStorage.setItem(CELL_HEIGHT_KEY, String(height))
 }

@@ -1,10 +1,10 @@
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { useRouter } from 'vue-router'
 import WeekSelector from '../components/WeekSelector.vue'
 import CourseCard from '../components/CourseCard.vue'
 import EmptyState from '../components/EmptyState.vue'
-import { loadCourses, saveCourses, loadPeriods } from '../utils/storage'
+import { loadCourses, saveCourses, loadPeriods, loadCellHeight } from '../utils/storage'
 import { getCurrentWeekNumber, getCoursesForDay, DEFAULT_PERIODS, WEEK_DAYS, getWeekDateRange } from '../utils/schedule'
 
 const props = defineProps({
@@ -24,7 +24,38 @@ onMounted(() => {
   if (customPeriods) {
     periods.value = customPeriods
   }
+  updateCellHeight()
+  window.addEventListener('resize', updateCellHeight)
 })
+
+onBeforeUnmount(() => {
+  window.removeEventListener('resize', updateCellHeight)
+})
+
+// 动态计算单元格高度，适配不同屏幕
+const cellHeight = ref(100)
+const sectionGap = 8
+
+function updateCellHeight() {
+  // 可用高度 = 视口高度 - 顶部栏 - 周选择器 - 底部导航 - 表头
+  const vh = window.innerHeight
+  const topBar = 56   // 顶部栏约56px
+  const weekSel = 50  // 周选择器约50px
+  const bottomNav = 56 // 底部导航约56px
+  const header = 48   // 表头约48px
+  const available = vh - topBar - weekSel - bottomNav - header - sectionGap * 2
+  // 12节课，3个时间段，每个时间段4节
+  const h = Math.floor(available / 12)
+  const autoHeight = Math.max(80, Math.min(200, h))
+
+  // 优先使用用户自定义高度，但限制在80~200范围内
+  const customHeight = loadCellHeight()
+  if (customHeight && customHeight >= 80) {
+    cellHeight.value = Math.min(200, customHeight)
+  } else {
+    cellHeight.value = autoHeight
+  }
+}
 
 const todayDayOfWeek = computed(() => {
   const d = new Date().getDay()
@@ -87,10 +118,8 @@ function isCellOccupied(dayIndex, periodIndex) {
   )
 }
 
-const CELL_HEIGHT = 48
-const SECTION_GAP = 8
-
 function getCoursePosition(course) {
+  const ch = cellHeight.value
   let sectionOffset = 0
   if (course.startPeriod >= 9) {
     sectionOffset = 2
@@ -98,8 +127,8 @@ function getCoursePosition(course) {
     sectionOffset = 1
   }
   const indexInSection = course.startPeriod - (sectionOffset * 4 + 1)
-  const top = sectionOffset * (CELL_HEIGHT * 4 + SECTION_GAP) + indexInSection * CELL_HEIGHT
-  const height = (course.endPeriod - course.startPeriod + 1) * CELL_HEIGHT - 4
+  const top = sectionOffset * (ch * 4 + sectionGap) + indexInSection * ch
+  const height = (course.endPeriod - course.startPeriod + 1) * ch
   return { top, height }
 }
 
@@ -125,7 +154,7 @@ function onTouchEnd(e) {
 </script>
 
 <template>
-  <div class="week-view">
+  <div class="week-view" :style="{ '--cell-h': cellHeight + 'px', '--section-gap': sectionGap + 'px' }">
     <!-- 顶部区域 -->
     <div class="week-view__top">
       <div class="week-view__brand">
@@ -133,11 +162,11 @@ function onTouchEnd(e) {
         <span class="week-view__app-name">云课</span>
       </div>
       <div class="week-view__top-actions">
-        <button class="week-view__dark-toggle" @click="emit('toggleDark')" :title="darkMode ? '切换亮色' : '切换暗色'">
+        <button class="week-view__icon-btn" @click="emit('toggleDark')" :title="darkMode ? '切换亮色' : '切换暗色'">
           <svg v-if="darkMode" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
           <svg v-else width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
         </button>
-        <button class="week-view__settings" @click="goToSettings">
+        <button class="week-view__icon-btn" @click="goToSettings">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
         </button>
       </div>
@@ -165,13 +194,13 @@ function onTouchEnd(e) {
 
       <!-- 课程区域 -->
       <div class="timetable__body">
+        <!-- 左侧时间列 -->
         <div class="timetable__time-col">
           <div
             v-for="section in timeSections"
             :key="section.label"
             class="timetable__time-section"
           >
-            <div class="timetable__time-section-label">{{ section.label }}</div>
             <div
               v-for="p in section.periods"
               :key="p.period"
@@ -179,6 +208,7 @@ function onTouchEnd(e) {
             >
               <span class="timetable__period-num">{{ p.period }}</span>
               <span class="timetable__period-time">{{ p.start }}</span>
+              <span class="timetable__period-time">{{ p.end }}</span>
             </div>
           </div>
         </div>
@@ -269,9 +299,10 @@ function onTouchEnd(e) {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 10px 16px;
-  padding-top: max(10px, env(safe-area-inset-top));
+  padding: 8px 12px;
+  padding-top: max(8px, env(safe-area-inset-top));
   background: var(--bg-secondary);
+  flex-shrink: 0;
 }
 
 .week-view__brand {
@@ -281,11 +312,11 @@ function onTouchEnd(e) {
 }
 
 .week-view__logo {
-  font-size: 22px;
+  font-size: 20px;
 }
 
 .week-view__app-name {
-  font-size: 18px;
+  font-size: 17px;
   font-weight: 700;
   background: linear-gradient(135deg, var(--accent), #1A5276);
   -webkit-background-clip: text;
@@ -299,13 +330,12 @@ function onTouchEnd(e) {
   gap: 6px;
 }
 
-.week-view__dark-toggle,
-.week-view__settings {
+.week-view__icon-btn {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 36px;
-  height: 36px;
+  width: 34px;
+  height: 34px;
   border: none;
   border-radius: 10px;
   background: var(--bg-tertiary);
@@ -314,8 +344,7 @@ function onTouchEnd(e) {
   transition: background 0.2s;
 }
 
-.week-view__dark-toggle:active,
-.week-view__settings:active {
+.week-view__icon-btn:active {
   background: var(--bg-hover);
 }
 
@@ -325,6 +354,7 @@ function onTouchEnd(e) {
   overflow: auto;
   -webkit-overflow-scrolling: touch;
   background: var(--bg-secondary);
+  min-height: 0; /* 防止 flex 子项溢出 */
 }
 
 .timetable__header {
@@ -334,6 +364,7 @@ function onTouchEnd(e) {
   z-index: 10;
   background: var(--bg-secondary);
   border-bottom: 1px solid var(--border-primary);
+  flex-shrink: 0;
 }
 
 .timetable__header-time {
@@ -346,8 +377,9 @@ function onTouchEnd(e) {
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 8px 0;
-  gap: 2px;
+  padding: 6px 0;
+  gap: 1px;
+  min-width: 0; /* 允许缩小 */
 }
 
 .timetable__header-day--today {
@@ -355,17 +387,17 @@ function onTouchEnd(e) {
 }
 
 .timetable__day-label {
-  font-size: 11px;
+  font-size: 10px;
   color: var(--text-tertiary);
   font-weight: 500;
 }
 
 .timetable__day-date {
-  font-size: 15px;
+  font-size: 14px;
   color: var(--text-secondary);
   font-weight: 600;
-  width: 26px;
-  height: 26px;
+  width: 22px;
+  height: 22px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -394,44 +426,43 @@ function onTouchEnd(e) {
   flex-direction: column;
 }
 
-.timetable__time-section-label {
-  text-align: center;
-  font-size: 9px;
-  color: var(--text-tertiary);
-  padding: 3px 0;
-  font-weight: 600;
-  letter-spacing: 1px;
+/* section 之间的间距与右侧 grid 保持一致 */
+.timetable__time-section + .timetable__time-section {
+  margin-top: var(--section-gap);
 }
 
 .timetable__time-cell {
-  height: 48px;
+  height: var(--cell-h);
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 1px;
+  gap: 0px;
 }
 
 .timetable__period-num {
-  font-size: 10px;
-  font-weight: 700;
+  font-size: 9px;
+  font-weight: 600;
   color: var(--text-tertiary);
 }
 
 .timetable__period-time {
-  font-size: 8px;
+  font-size: 7px;
   color: var(--text-tertiary);
   font-variant-numeric: tabular-nums;
+  line-height: 1.2;
 }
 
 .timetable__grid {
   display: flex;
   flex: 1;
+  min-width: 0;
 }
 
 .timetable__day-col {
   flex: 1;
   position: relative;
+  min-width: 0; /* 允许缩小 */
 }
 
 .timetable__day-col--today {
@@ -444,11 +475,11 @@ function onTouchEnd(e) {
 }
 
 .timetable__day-section + .timetable__day-section {
-  margin-top: 8px;
+  margin-top: var(--section-gap);
 }
 
 .timetable__cell {
-  height: 48px;
+  height: var(--cell-h);
   border-right: 1px solid var(--border-cell);
   border-bottom: 1px solid var(--border-cell);
   display: flex;
@@ -479,8 +510,8 @@ function onTouchEnd(e) {
 
 .timetable__course-wrapper {
   position: absolute;
-  left: 2px;
-  right: 2px;
+  left: 1px;
+  right: 1px;
   z-index: 5;
   cursor: pointer;
 }
@@ -488,12 +519,15 @@ function onTouchEnd(e) {
 /* 底部导航 */
 .bottom-nav {
   display: flex;
-  align-items: center;
+  align-items: flex-end;
   justify-content: space-around;
-  padding: 6px 20px;
-  padding-bottom: max(6px, env(safe-area-inset-bottom));
+  padding: 4px 16px;
+  padding-bottom: max(4px, env(safe-area-inset-bottom));
   background: var(--bg-secondary);
   border-top: 1px solid var(--border-primary);
+  flex-shrink: 0;
+  position: relative;
+  z-index: 10;
 }
 
 .bottom-nav__item {
@@ -506,7 +540,7 @@ function onTouchEnd(e) {
   color: var(--text-tertiary);
   font-size: 10px;
   cursor: pointer;
-  padding: 4px 16px;
+  padding: 6px 16px;
   transition: color 0.2s;
 }
 
@@ -518,20 +552,21 @@ function onTouchEnd(e) {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 52px;
-  height: 52px;
-  border-radius: 16px;
+  width: 46px;
+  height: 46px;
+  border-radius: 14px;
   background: linear-gradient(135deg, var(--accent), var(--accent-hover));
   color: #fff;
   border: none;
-  box-shadow: 0 4px 20px rgba(74, 144, 217, 0.35);
+  box-shadow: 0 2px 12px rgba(74, 144, 217, 0.3);
   cursor: pointer;
   transition: transform 0.15s, box-shadow 0.15s;
-  margin-top: -18px;
+  margin-bottom: 2px;
+  flex-shrink: 0;
 }
 
 .bottom-nav__add:active {
   transform: scale(0.92);
-  box-shadow: 0 2px 10px rgba(74, 144, 217, 0.25);
+  box-shadow: 0 1px 6px rgba(74, 144, 217, 0.2);
 }
 </style>
