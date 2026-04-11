@@ -34,7 +34,7 @@ onMounted(() => {
   notificationMinutes.value = getNotificationMinutes()
   const savedCellHeight = loadCellHeight()
   cellHeight.value = savedCellHeight || 0
-  if (Capacitor.isNativePlatform()) {
+  if (isNotificationEnabled()) {
     checkNotificationPermission().then(granted => {
       notificationPermissionGranted.value = granted
     })
@@ -312,7 +312,7 @@ function cancelImport() {
 
     <div class="settings__body">
       <!-- 课前提醒 -->
-      <div v-if="isNative" class="settings__section">
+      <div class="settings__section">
         <div class="settings__section-title">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
@@ -579,7 +579,9 @@ function cancelImport() {
 .settings__body {
   flex: 1;
   overflow: auto;
+  overflow-y: auto;
   padding: 16px;
+  padding-bottom: 80px;
   -webkit-overflow-scrolling: touch;
 }
 

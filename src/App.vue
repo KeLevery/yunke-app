@@ -1,5 +1,6 @@
 <script setup>
 import { ref, watch, onMounted } from 'vue'
+import FluidCloud from './components/FluidCloud.vue'
 
 const darkMode = ref(false)
 
@@ -28,6 +29,7 @@ function toggleDarkMode() {
 </script>
 
 <template>
+  <FluidCloud :dark-mode="darkMode" />
   <router-view v-slot="{ Component }">
     <Transition name="page" mode="out-in">
       <component :is="Component" :dark-mode="darkMode" @toggle-dark="toggleDarkMode" />

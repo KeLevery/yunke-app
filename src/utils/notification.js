@@ -6,6 +6,9 @@ import { getCurrentWeekNumber, DEFAULT_PERIODS } from './schedule'
 const NOTIFICATION_ENABLED_KEY = 'yunke_notification_enabled'
 const NOTIFICATION_MINUTES_KEY = 'yunke_notification_minutes'
 
+// 浏览器端定时通知的 setTimeout ID 存储
+const browserTimers = []
+
 /**
  * 检查通知是否启用
  */
@@ -47,41 +50,83 @@ export function setNotificationMinutes(minutes) {
  * 请求通知权限
  */
 export async function requestNotificationPermission() {
-  if (!Capacitor.isNativePlatform()) return false
-  try {
-    const result = await LocalNotifications.requestPermissions()
-    return result.display === 'granted'
-  } catch (e) {
-    console.warn('请求通知权限失败:', e)
-    return false
+  if (Capacitor.isNativePlatform()) {
+    try {
+      const result = await LocalNotifications.requestPermissions()
+      return result.display === 'granted'
+    } catch (e) {
+      console.warn('请求通知权限失败:', e)
+      return false
+    }
   }
+
+  // 浏览器端
+  if (!('Notification' in window)) return false
+  if (Notification.permission === 'granted') return true
+  if (Notification.permission === 'denied') return false
+  const result = await Notification.requestPermission()
+  return result === 'granted'
 }
 
 /**
  * 检查通知权限
  */
 export async function checkNotificationPermission() {
-  if (!Capacitor.isNativePlatform()) return false
-  try {
-    const result = await LocalNotifications.checkPermissions()
-    return result.display === 'granted'
-  } catch (e) {
-    return false
+  if (Capacitor.isNativePlatform()) {
+    try {
+      const result = await LocalNotifications.checkPermissions()
+      return result.display === 'granted'
+    } catch (e) {
+      return false
+    }
   }
+
+  // 浏览器端
+  return 'Notification' in window && Notification.permission === 'granted'
 }
 
 /**
  * 取消所有已安排的通知
  */
 export async function cancelAllNotifications() {
-  if (!Capacitor.isNativePlatform()) return
-  try {
-    const pending = await LocalNotifications.getPending()
-    if (pending.notifications.length > 0) {
-      await LocalNotifications.cancel(pending)
+  if (Capacitor.isNativePlatform()) {
+    try {
+      const pending = await LocalNotifications.getPending()
+      if (pending.notifications.length > 0) {
+        await LocalNotifications.cancel(pending)
+      }
+    } catch (e) {
+      console.warn('取消通知失败:', e)
     }
+  }
+
+  // 浏览器端：清除所有 setTimeout
+  for (const timerId of browserTimers) {
+    clearTimeout(timerId)
+  }
+  browserTimers.length = 0
+}
+
+/**
+ * 在浏览器端显示通知
+ */
+function showBrowserNotification(title, body) {
+  try {
+    const n = new Notification(title, {
+      body,
+      icon: '/pwa-192x192.png',
+      badge: '/pwa-192x192.png',
+      tag: 'yunke-course-reminder',
+      renotify: true
+    })
+    n.onclick = () => {
+      window.focus()
+      n.close()
+    }
+    // 5秒后自动关闭
+    setTimeout(() => n.close(), 5000)
   } catch (e) {
-    console.warn('取消通知失败:', e)
+    console.warn('浏览器通知显示失败:', e)
   }
 }
 
@@ -89,13 +134,23 @@ export async function cancelAllNotifications() {
  * 调度所有课程的通知
  */
 export async function scheduleAllNotifications() {
-  if (!Capacitor.isNativePlatform()) return
   if (!isNotificationEnabled()) return
 
+  if (Capacitor.isNativePlatform()) {
+    await scheduleNativeNotifications()
+  } else {
+    scheduleBrowserNotifications()
+  }
+}
+
+/**
+ * 原生平台调度通知
+ */
+async function scheduleNativeNotifications() {
   const granted = await checkNotificationPermission()
   if (!granted) return
 
-  await cancelAllNotifications()
+  await cancelNativeNotifications()
 
   const courses = loadCourses() || []
   const periods = loadPeriods() || DEFAULT_PERIODS
@@ -112,7 +167,6 @@ export async function scheduleAllNotifications() {
     targetDate.setDate(now.getDate() + dayOffset)
     const targetDayOfWeek = targetDate.getDay() === 0 ? 7 : targetDate.getDay()
 
-    // 获取当天有课的课程
     const dayCourses = courses.filter(c =>
       c.dayOfWeek === targetDayOfWeek &&
       c.weeks && c.weeks.includes(weekNumber)
@@ -122,18 +176,14 @@ export async function scheduleAllNotifications() {
       const startPeriod = periods.find(p => p.period === course.startPeriod)
       if (!startPeriod) continue
 
-      // 解析开始时间
       const [hours, minutes] = startPeriod.start.split(':').map(Number)
       const courseStart = new Date(targetDate)
       courseStart.setHours(hours, minutes, 0, 0)
 
-      // 提前提醒时间
       const notifyAt = new Date(courseStart.getTime() - advanceMinutes * 60 * 1000)
 
-      // 只安排未来的通知
       if (notifyAt <= now) continue
 
-      // Android 通知 ID 范围限制
       const notifId = (dayOffset * 100 + course.startPeriod) % 2147483647
 
       notifications.push({
@@ -146,16 +196,13 @@ export async function scheduleAllNotifications() {
         actionTypeId: '',
         extra: null,
         smallIcon: 'ic_stat_icon',
-        largeIcon: 'ic_launcher',
-        fullScreenIntent: true
+        largeIcon: 'ic_launcher'
       })
     }
   }
 
-  // 批量调度（每次最多64条，Android限制）
   if (notifications.length > 0) {
     try {
-      // 分批处理
       const batchSize = 60
       for (let i = 0; i < notifications.length; i += batchSize) {
         const batch = notifications.slice(i, i + batchSize)
@@ -164,6 +211,112 @@ export async function scheduleAllNotifications() {
     } catch (e) {
       console.warn('调度通知失败:', e)
     }
+  }
+}
+
+/**
+ * 浏览器端调度通知（使用 setTimeout 模拟）
+ * 注意：页面关闭后通知不会触发，仅适用于调试
+ */
+function scheduleBrowserNotifications() {
+  // 先清除旧的定时器
+  for (const timerId of browserTimers) {
+    clearTimeout(timerId)
+  }
+  browserTimers.length = 0
+
+  if (!('Notification' in window) || Notification.permission !== 'granted') return
+
+  const courses = loadCourses() || []
+  const periods = loadPeriods() || DEFAULT_PERIODS
+  const weekNumber = getCurrentWeekNumber()
+  const advanceMinutes = getNotificationMinutes()
+  const now = new Date()
+
+  // 只为今天的课程安排通知
+  const todayDayOfWeek = now.getDay() === 0 ? 7 : now.getDay()
+
+  const dayCourses = courses.filter(c =>
+    c.dayOfWeek === todayDayOfWeek &&
+    c.weeks && c.weeks.includes(weekNumber)
+  )
+
+  for (const course of dayCourses) {
+    const startPeriod = periods.find(p => p.period === course.startPeriod)
+    if (!startPeriod) continue
+
+    const [hours, minutes] = startPeriod.start.split(':').map(Number)
+    const courseStart = new Date(now)
+    courseStart.setHours(hours, minutes, 0, 0)
+
+    const notifyAt = new Date(courseStart.getTime() - advanceMinutes * 60 * 1000)
+
+    const diffMs = notifyAt.getTime() - now.getTime()
+    if (diffMs <= 0) continue
+
+    const title = `📚 即将上课：${course.name || '未命名课程'}`
+    const body = buildNotificationBody(course, startPeriod, advanceMinutes)
+
+    const timerId = setTimeout(() => {
+      showBrowserNotification(title, body)
+      // 完成后从数组中移除
+      const idx = browserTimers.indexOf(timerId)
+      if (idx !== -1) browserTimers.splice(idx, 1)
+    }, diffMs)
+
+    browserTimers.push(timerId)
+  }
+}
+
+/**
+ * 取消原生平台通知
+ */
+async function cancelNativeNotifications() {
+  try {
+    const pending = await LocalNotifications.getPending()
+    if (pending.notifications.length > 0) {
+      await LocalNotifications.cancel(pending)
+    }
+  } catch (e) {
+    console.warn('取消通知失败:', e)
+  }
+}
+
+/**
+ * 发送即时通知（流体云展示时调用）
+ */
+export async function sendImmediateNotification(course, diffMin) {
+  if (!isNotificationEnabled()) return
+
+  const granted = await checkNotificationPermission()
+  if (!granted) return
+
+  const minutesText = diffMin <= 0 ? '即将开始' : `${diffMin}分钟后开始`
+  const title = `📚 即将上课：${course.name || '未命名课程'}`
+  const body = [
+    course.location ? `📍 ${course.location}` : '',
+    course.teacher ? `👤 ${course.teacher}` : '',
+    minutesText
+  ].filter(Boolean).join(' · ')
+
+  if (Capacitor.isNativePlatform()) {
+    try {
+      await LocalNotifications.schedule({
+        notifications: [{
+          id: -1,
+          title,
+          body,
+          schedule: { at: new Date() },
+          sound: undefined,
+          smallIcon: 'ic_stat_icon',
+          largeIcon: 'ic_launcher'
+        }]
+      })
+    } catch (e) {
+      console.warn('发送即时通知失败:', e)
+    }
+  } else {
+    showBrowserNotification(title, body)
   }
 }
 
@@ -183,18 +336,22 @@ function buildNotificationBody(course, startPeriod, advanceMinutes) {
  * 初始化通知（应用启动时调用）
  */
 export async function initNotifications() {
-  if (!Capacitor.isNativePlatform()) return
+  if (Capacitor.isNativePlatform()) {
+    try {
+      await LocalNotifications.registerActionTypes({
+        types: []
+      })
+    } catch (e) {
+      // 忽略
+    }
 
-  try {
-    // 注册通知动作类型
-    await LocalNotifications.registerActionTypes({
-      types: []
-    })
-  } catch (e) {
-    // 忽略
-  }
-
-  if (isNotificationEnabled()) {
-    await scheduleAllNotifications()
+    if (isNotificationEnabled()) {
+      await scheduleAllNotifications()
+    }
+  } else {
+    // 浏览器端：如果已启用通知且已有权限，调度定时通知
+    if (isNotificationEnabled() && 'Notification' in window && Notification.permission === 'granted') {
+      scheduleBrowserNotifications()
+    }
   }
 }
