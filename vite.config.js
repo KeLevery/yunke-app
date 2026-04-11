@@ -8,13 +8,14 @@ export default defineConfig({
     port: 3000
   },
   build: {
-    target: 'es2015',
+    target: 'esnext',
     cssCodeSplit: true,
     rollupOptions: {
       output: {
         manualChunks: {
           'vendor-vue': ['vue', 'vue-router'],
-          'vendor-capacitor': ['@capacitor/core', '@capacitor/app', '@capacitor/local-notifications']
+          'vendor-capacitor': ['@capacitor/core', '@capacitor/app', '@capacitor/local-notifications'],
+          'vendor-pdfjs': ['pdfjs-dist']
         }
       }
     }

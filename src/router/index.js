@@ -30,6 +30,12 @@ const routes = [
     name: 'Settings',
     component: () => import('../views/Settings.vue'),
     meta: { title: '时间设置' }
+  },
+  {
+    path: '/import',
+    name: 'PdfImport',
+    component: () => import('../views/PdfImport.vue'),
+    meta: { title: '导入课表' }
   }
 ]
 
