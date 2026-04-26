@@ -1,38 +1,25 @@
 <script setup>
-import { ref, watch, onMounted } from 'vue'
+import { ref } from 'vue'
+import { useRouter } from 'vue-router'
+import { useTheme } from './composables/useTheme'
 import FluidCloud from './components/FluidCloud.vue'
 
-const darkMode = ref(false)
+const { toggleDarkMode } = useTheme()
+const router = useRouter()
+const transitionName = ref('slide-right')
 
-onMounted(() => {
-  const saved = localStorage.getItem('yunke_dark_mode')
-  if (saved !== null) {
-    darkMode.value = saved === 'true'
-  } else {
-    darkMode.value = window.matchMedia('(prefers-color-scheme: dark)').matches
-  }
-  applyTheme()
+router.beforeEach((to, from) => {
+  const toDepth = to.meta.depth ?? 0
+  const fromDepth = from.meta.depth ?? 0
+  transitionName.value = toDepth > fromDepth ? 'slide-right' : toDepth < fromDepth ? 'slide-left' : 'fade-scale'
 })
-
-watch(darkMode, () => {
-  localStorage.setItem('yunke_dark_mode', darkMode.value)
-  applyTheme()
-})
-
-function applyTheme() {
-  document.documentElement.setAttribute('data-theme', darkMode.value ? 'dark' : 'light')
-}
-
-function toggleDarkMode() {
-  darkMode.value = !darkMode.value
-}
 </script>
 
 <template>
-  <FluidCloud :dark-mode="darkMode" />
+  <FluidCloud />
   <router-view v-slot="{ Component }">
-    <Transition name="page" mode="out-in">
-      <component :is="Component" :dark-mode="darkMode" @toggle-dark="toggleDarkMode" />
+    <Transition :name="transitionName" mode="out-in">
+      <component :is="Component" @toggle-dark="toggleDarkMode" />
     </Transition>
   </router-view>
 </template>
@@ -72,6 +59,9 @@ function toggleDarkMode() {
 
   --course-card-location: #666;
   --course-card-time: #999;
+
+  --glass-bg: rgba(255, 255, 255, 0.72);
+  --glass-border: rgba(255, 255, 255, 0.3);
 }
 
 [data-theme="dark"] {
@@ -106,6 +96,9 @@ function toggleDarkMode() {
 
   --course-card-location: #8b949e;
   --course-card-time: #6e7681;
+
+  --glass-bg: rgba(22, 27, 34, 0.72);
+  --glass-border: rgba(48, 54, 61, 0.3);
 }
 
 /* 全局重置 */
@@ -161,23 +154,106 @@ select {
   appearance: none;
 }
 
-/* 页面切换动画 */
-.page-enter-active {
-  transition: opacity 0.2s ease, transform 0.2s ease;
-}
+/* ========== 方向感知页面切换动画 ========== */
 
-.page-leave-active {
-  transition: opacity 0.15s ease, transform 0.15s ease;
+/* 前进 → 新页面从右侧滑入 */
+.slide-right-enter-active {
+  transition: transform 0.35s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.3s ease;
 }
-
-.page-enter-from {
+.slide-right-leave-active {
+  transition: transform 0.28s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.2s ease;
+}
+.slide-right-enter-from {
   opacity: 0;
-  transform: translateX(16px);
+  transform: translateX(60px) scale(0.97);
+}
+.slide-right-leave-to {
+  opacity: 0;
+  transform: translateX(-30px) scale(0.98);
 }
 
-.page-leave-to {
+/* 后退 ← 页面从左侧滑入 */
+.slide-left-enter-active {
+  transition: transform 0.35s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.3s ease;
+}
+.slide-left-leave-active {
+  transition: transform 0.28s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.2s ease;
+}
+.slide-left-enter-from {
   opacity: 0;
-  transform: translateX(-8px);
+  transform: translateX(-60px) scale(0.97);
+}
+.slide-left-leave-to {
+  opacity: 0;
+  transform: translateX(30px) scale(0.98);
+}
+
+/* 同级切换 — 淡入缩放 */
+.fade-scale-enter-active {
+  transition: transform 0.3s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.25s ease;
+}
+.fade-scale-leave-active {
+  transition: transform 0.22s ease, opacity 0.18s ease;
+}
+.fade-scale-enter-from {
+  opacity: 0;
+  transform: scale(0.96);
+}
+.fade-scale-leave-to {
+  opacity: 0;
+  transform: scale(1.02);
+}
+
+/* ========== 通用动画工具类 ========== */
+
+/* 渐入上浮 — 用于页面内元素入场 */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* 渐入缩放 — 用于卡片入场 */
+@keyframes fadeInScale {
+  from {
+    opacity: 0;
+    transform: scale(0.92);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* 弹性缩放 — 用于按钮点击 */
+@keyframes bouncePress {
+  0% { transform: scale(1); }
+  40% { transform: scale(0.92); }
+  70% { transform: scale(1.02); }
+  100% { transform: scale(1); }
+}
+
+/* 涟漪扩散 */
+@keyframes rippleExpand {
+  from {
+    transform: scale(0);
+    opacity: 0.4;
+  }
+  to {
+    transform: scale(2.5);
+    opacity: 0;
+  }
+}
+
+/* 柔和呼吸光晕 */
+@keyframes softGlow {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(74, 144, 217, 0); }
+  50% { box-shadow: 0 0 0 6px rgba(74, 144, 217, 0.1); }
 }
 
 /* 滚动条隐藏 */

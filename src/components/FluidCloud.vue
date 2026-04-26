@@ -1,12 +1,14 @@
 <script setup>
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
-import { loadCourses, loadPeriods } from '../utils/storage'
-import { getCurrentWeekNumber, DEFAULT_PERIODS } from '../utils/schedule'
+import { useCourses } from '../composables/useCourses'
+import { usePeriods } from '../composables/usePeriods'
+import { useTheme } from '../composables/useTheme'
+import { getCurrentWeekNumber } from '../utils/schedule'
 import { isNotificationEnabled, getNotificationMinutes, sendImmediateNotification } from '../utils/notification'
 
-const props = defineProps({
-  darkMode: { type: Boolean, default: false }
-})
+const { courses } = useCourses()
+const { periods, getTimeRange } = usePeriods()
+const { darkMode } = useTheme()
 
 // ========== 核心状态 ==========
 const visible = ref(false)
@@ -34,11 +36,9 @@ const countdownText = computed(() => {
 
 const periodInfo = computed(() => {
   if (!course.value) return ''
-  const periods = loadPeriods() || DEFAULT_PERIODS
-  const startP = periods.find(p => p.period === course.value.startPeriod)
-  const endP = periods.find(p => p.period === course.value.endPeriod)
-  if (startP && endP) {
-    return `${startP.start}–${endP.end} · 第${course.value.startPeriod}-${course.value.endPeriod}节`
+  const timeRange = getTimeRange(course.value.startPeriod, course.value.endPeriod)
+  if (timeRange) {
+    return `${timeRange} · 第${course.value.startPeriod}-${course.value.endPeriod}节`
   }
   return `第${course.value.startPeriod}-${course.value.endPeriod}节`
 })
@@ -49,15 +49,14 @@ function findNextCourse() {
   try {
     if (!isNotificationEnabled()) return null
 
-    const courses = loadCourses() || []
-    if (courses.length === 0) return null
+    if (courses.value.length === 0) return null
 
     const now = new Date()
     const todayDayOfWeek = now.getDay() === 0 ? 7 : now.getDay()
     const weekNumber = getCurrentWeekNumber()
 
     // 筛选当天有课的课程
-    const dayCourses = courses
+    const dayCourses = courses.value
       .filter(c =>
         c.dayOfWeek === todayDayOfWeek &&
         c.weeks && c.weeks.includes(weekNumber)
@@ -66,11 +65,9 @@ function findNextCourse() {
 
     if (dayCourses.length === 0) return null
 
-    const periods = loadPeriods() || DEFAULT_PERIODS
-
     // 找到下一节未来课程（或正在进行的课程）
     for (const c of dayCourses) {
-      const startP = periods.find(p => p.period === c.startPeriod)
+      const startP = periods.value.find(p => p.period === c.startPeriod)
       if (!startP) continue
 
       const [hours, minutes] = startP.start.split(':').map(Number)

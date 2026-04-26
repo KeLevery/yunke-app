@@ -549,9 +549,13 @@ function cancelImport() {
   align-items: center;
   padding: 10px 16px;
   padding-top: max(10px, env(safe-area-inset-top));
-  background: var(--bg-secondary);
-  border-bottom: 1px solid var(--border-primary);
+  background: var(--glass-bg);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border-bottom: 1px solid var(--glass-border);
   gap: 12px;
+  flex-shrink: 0;
+  animation: fadeInUp 0.35s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 .settings__back {
@@ -587,7 +591,15 @@ function cancelImport() {
 
 .settings__section {
   margin-bottom: 24px;
+  animation: fadeInUp 0.38s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
+
+.settings__section:nth-child(1) { animation-delay: 0.02s; }
+.settings__section:nth-child(2) { animation-delay: 0.06s; }
+.settings__section:nth-child(3) { animation-delay: 0.1s; }
+.settings__section:nth-child(4) { animation-delay: 0.14s; }
+.settings__section:nth-child(5) { animation-delay: 0.18s; }
+
 
 .settings__section-title {
   display: flex;
@@ -711,10 +723,15 @@ function cancelImport() {
 .settings__footer {
   padding: 12px 16px;
   padding-bottom: max(12px, env(safe-area-inset-bottom));
-  background: var(--bg-secondary);
-  border-top: 1px solid var(--border-primary);
+  background: var(--glass-bg);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border-top: 1px solid var(--glass-border);
   display: flex;
   gap: 10px;
+  flex-shrink: 0;
+  position: relative;
+  z-index: 10;
 }
 
 .settings__reset {
@@ -849,6 +866,8 @@ function cancelImport() {
   position: fixed;
   inset: 0;
   background: var(--modal-overlay);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -863,12 +882,13 @@ function cancelImport() {
   width: 100%;
   max-width: 320px;
   box-shadow: var(--shadow-elevated);
-  animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  animation: modalSpringIn 0.4s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-@keyframes slideUp {
-  from { transform: translateY(30px); opacity: 0; }
-  to { transform: translateY(0); opacity: 1; }
+@keyframes modalSpringIn {
+  0% { transform: translateY(40px) scale(0.9); opacity: 0; }
+  60% { transform: translateY(-4px) scale(1.01); opacity: 1; }
+  100% { transform: translateY(0) scale(1); opacity: 1; }
 }
 
 .modal__title { font-size: 17px; font-weight: 700; color: var(--text-primary); margin-bottom: 8px; }

@@ -1,7 +1,7 @@
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
-import { addCourse, updateCourse, getCourseById, deleteCourse, getHistory, addHistoryItem, loadPeriods, savePeriods } from '../utils/storage'
+import { addCourse, updateCourse, getCourseById, deleteCourse, getHistory, addHistoryItem, loadPeriods, savePeriods, removeHistoryItem as removeHistoryFromStorage } from '../utils/storage'
 import { WEEK_DAYS, DEFAULT_PERIODS, COURSE_COLORS } from '../utils/schedule'
 
 const router = useRouter()
@@ -137,8 +137,7 @@ function removeHistoryItem(type, value) {
   const idx = list.indexOf(value)
   if (idx !== -1) {
     list.splice(idx, 1)
-    const key = `yunke_history_${type}`
-    localStorage.setItem(key, JSON.stringify(list))
+    removeHistoryFromStorage(type, value)
   }
 }
 
@@ -294,9 +293,10 @@ const hasHistory = (field) => (history.value[field] || []).length > 0
               <span>{{ historySearch ? '没有匹配的记录' : '暂无历史记录' }}</span>
             </div>
             <div
-              v-for="item in filteredHistory"
+              v-for="(item, index) in filteredHistory"
               :key="item"
               class="history-list__item"
+              :style="{ '--stagger-index': index }"
               :class="{ 'history-list__item--active': form[historyField] === item }"
               @click="selectHistoryItem(item)"
             >
@@ -388,9 +388,12 @@ const hasHistory = (field) => (history.value[field] || []).length > 0
   align-items: center;
   padding: 10px 16px;
   padding-top: max(10px, env(safe-area-inset-top));
-  background: var(--bg-secondary);
-  border-bottom: 1px solid var(--border-primary);
+  background: var(--glass-bg);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border-bottom: 1px solid var(--glass-border);
   gap: 12px;
+  animation: fadeInUp 0.35s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 .course-form__back {
@@ -432,7 +435,17 @@ const hasHistory = (field) => (history.value[field] || []).length > 0
   display: flex;
   flex-direction: column;
   gap: 6px;
+  animation: fadeInUp 0.4s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
+
+/* 交错入场动画 */
+.form-group:nth-child(1) { animation-delay: 0.03s; }
+.form-group:nth-child(2) { animation-delay: 0.06s; }
+.form-group:nth-child(3) { animation-delay: 0.09s; }
+.form-group:nth-child(4) { animation-delay: 0.12s; }
+.form-group:nth-child(5) { animation-delay: 0.15s; }
+.form-group:nth-child(6) { animation-delay: 0.18s; }
+.form-group:nth-child(7) { animation-delay: 0.21s; }
 
 .form-label {
   font-size: 13px;
@@ -461,6 +474,12 @@ const hasHistory = (field) => (history.value[field] || []).length > 0
   font-weight: 500;
   cursor: pointer;
   padding: 0;
+  transition: color 0.2s, transform 0.15s;
+}
+
+.form-link:active {
+  color: var(--accent-hover);
+  transform: scale(0.94);
 }
 
 .form-input-wrap {
@@ -477,7 +496,7 @@ const hasHistory = (field) => (history.value[field] || []).length > 0
   color: var(--text-primary);
   background: var(--bg-secondary);
   outline: none;
-  transition: border-color 0.2s, box-shadow 0.2s;
+  transition: border-color 0.2s, box-shadow 0.2s, transform 0.2s;
   width: 100%;
   flex: 1;
   padding-right: 40px;
@@ -487,6 +506,7 @@ const hasHistory = (field) => (history.value[field] || []).length > 0
 .form-input:focus {
   border-color: var(--accent);
   box-shadow: 0 0 0 3px rgba(74, 144, 217, 0.1);
+  transform: translateY(-1px);
 }
 
 .form-input__picker {
@@ -521,7 +541,7 @@ const hasHistory = (field) => (history.value[field] || []).length > 0
   font-size: 13px;
   color: var(--text-tertiary);
   cursor: pointer;
-  transition: all 0.2s;
+  transition: all 0.25s cubic-bezier(0.22, 1, 0.36, 1);
   text-align: center;
   font-weight: 500;
 }
@@ -531,6 +551,7 @@ const hasHistory = (field) => (history.value[field] || []).length > 0
   background: var(--accent);
   color: #fff;
   box-shadow: 0 2px 8px rgba(74, 144, 217, 0.25);
+  transform: scale(1.05);
 }
 
 .period-selector { display: flex; align-items: center; gap: 8px; }
@@ -569,10 +590,14 @@ const hasHistory = (field) => (history.value[field] || []).length > 0
   background: var(--bg-secondary);
   color: var(--text-secondary);
   cursor: pointer;
-  transition: border-color 0.2s;
+  transition: border-color 0.2s, transform 0.15s, box-shadow 0.2s;
 }
 
-.form-week-btn:active { border-color: var(--accent); }
+.form-week-btn:active {
+  border-color: var(--accent);
+  transform: scale(0.99);
+  box-shadow: 0 2px 8px rgba(74, 144, 217, 0.12);
+}
 .form-week-btn__placeholder { font-size: 15px; color: var(--text-placeholder); }
 .form-week-btn__value { font-size: 15px; color: var(--accent); font-weight: 600; }
 
@@ -587,13 +612,17 @@ const hasHistory = (field) => (history.value[field] || []).length > 0
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: transform 0.15s, border-color 0.15s;
+  transition: transform 0.25s cubic-bezier(0.22, 1, 0.36, 1), border-color 0.2s, box-shadow 0.2s;
 }
 
 .color-selector__item--active {
   border-color: var(--text-primary);
-  transform: scale(1.15);
-  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+  transform: scale(1.2);
+  box-shadow: 0 3px 12px rgba(0,0,0,0.2);
+}
+
+.color-selector__item:active {
+  transform: scale(0.9);
 }
 
 .form-delete-btn {
@@ -610,15 +639,24 @@ const hasHistory = (field) => (history.value[field] || []).length > 0
   font-weight: 500;
   cursor: pointer;
   margin-top: 8px;
+  transition: transform 0.15s, background 0.2s;
 }
 
-.form-delete-btn:active { opacity: 0.8; }
+.form-delete-btn:active {
+  transform: scale(0.98);
+  background: rgba(231, 76, 60, 0.12);
+}
 
 .course-form__footer {
   padding: 12px 16px;
   padding-bottom: max(12px, env(safe-area-inset-bottom));
-  background: var(--bg-secondary);
-  border-top: 1px solid var(--border-primary);
+  background: var(--glass-bg);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border-top: 1px solid var(--glass-border);
+  position: relative;
+  z-index: 6;
+  animation: fadeInUp 0.38s cubic-bezier(0.22, 1, 0.36, 1) 0.06s both;
 }
 
 .form-save-btn {
@@ -631,18 +669,34 @@ const hasHistory = (field) => (history.value[field] || []).length > 0
   font-size: 16px;
   font-weight: 600;
   cursor: pointer;
-  transition: opacity 0.2s, transform 0.15s;
+  transition: opacity 0.2s, transform 0.2s, box-shadow 0.2s;
   box-shadow: 0 4px 16px rgba(74, 144, 217, 0.3);
+  position: relative;
+  overflow: hidden;
+}
+
+.form-save-btn::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, transparent 30%, rgba(255,255,255,0.15) 50%, transparent 70%);
+  transform: translateX(-100%);
+  transition: transform 0.6s ease;
+}
+.form-save-btn:not(:disabled):hover::after {
+  transform: translateX(100%);
 }
 
 .form-save-btn:disabled { opacity: 0.45; cursor: not-allowed; box-shadow: none; }
-.form-save-btn:not(:disabled):active { transform: scale(0.98); }
+.form-save-btn:not(:disabled):active { transform: scale(0.97); box-shadow: 0 2px 8px rgba(74, 144, 217, 0.2); }
 
 /* ========== 弹窗 ========== */
 .modal-overlay {
   position: fixed;
   inset: 0;
   background: var(--modal-overlay);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -658,7 +712,7 @@ const hasHistory = (field) => (history.value[field] || []).length > 0
   max-width: 400px;
   max-height: 80vh;
   overflow: auto;
-  animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  animation: modalSpringIn 0.4s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .modal__handle {
@@ -669,9 +723,10 @@ const hasHistory = (field) => (history.value[field] || []).length > 0
   margin: 0 auto 16px;
 }
 
-@keyframes slideUp {
-  from { transform: translateY(30px); opacity: 0; }
-  to { transform: translateY(0); opacity: 1; }
+@keyframes modalSpringIn {
+  0% { transform: translateY(40px) scale(0.9); opacity: 0; }
+  60% { transform: translateY(-4px) scale(1.01); opacity: 1; }
+  100% { transform: translateY(0) scale(1); opacity: 1; }
 }
 
 .modal__title { font-size: 17px; font-weight: 700; color: var(--text-primary); margin-bottom: 16px; }
@@ -717,6 +772,10 @@ const hasHistory = (field) => (history.value[field] || []).length > 0
   transition: all 0.15s;
   text-align: center;
   font-weight: 500;
+}
+
+.week-grid__item:active {
+  transform: scale(0.94);
 }
 
 .week-grid__item--active { border-color: var(--accent); background: var(--accent); color: #fff; }
@@ -811,6 +870,8 @@ const hasHistory = (field) => (history.value[field] || []).length > 0
   border-radius: 12px;
   cursor: pointer;
   transition: background 0.15s;
+  animation: fadeInUp 0.32s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation-delay: calc(var(--stagger-index, 0) * 0.03s);
 }
 
 .history-list__item:active { background: var(--bg-active); }

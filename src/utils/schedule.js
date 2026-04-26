@@ -174,18 +174,24 @@ function getDefaultSemesterStart() {
 }
 
 /**
- * 获取当前是第几周
+ * 获取指定日期是第几周
  */
-export function getCurrentWeekNumber() {
+export function getWeekNumberForDate(date = new Date()) {
   const semesterStart = getSemesterStartDate() || getDefaultSemesterStart()
-  const now = new Date()
   // 找到学期开始的那个周一
   const startDay = semesterStart.getDay() || 7
   const monday = new Date(semesterStart)
   monday.setDate(semesterStart.getDate() - startDay + 1)
-  const diff = now.getTime() - monday.getTime()
+  const target = new Date(date)
+  target.setHours(0, 0, 0, 0)
+  monday.setHours(0, 0, 0, 0)
+  const diff = target.getTime() - monday.getTime()
   const weekNum = Math.floor(diff / (7 * 24 * 60 * 60 * 1000)) + 1
   return Math.max(1, Math.min(weekNum, 25))
+}
+
+export function getCurrentWeekNumber() {
+  return getWeekNumberForDate(new Date())
 }
 
 /**

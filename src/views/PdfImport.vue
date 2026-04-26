@@ -305,6 +305,7 @@ const fileSize = computed(() => {
             v-for="(course, index) in parsedCourses"
             :key="index"
             class="course-card"
+            :style="{ '--stagger-index': index }"
           >
             <!-- 卡片头部 -->
             <div class="course-card__header" @click="toggleCard(index)">
@@ -462,10 +463,13 @@ const fileSize = computed(() => {
   align-items: center;
   padding: 10px 16px;
   padding-top: max(10px, env(safe-area-inset-top));
-  background: var(--bg-secondary);
-  border-bottom: 1px solid var(--border-primary);
+  background: var(--glass-bg);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border-bottom: 1px solid var(--glass-border);
   gap: 12px;
   flex-shrink: 0;
+  animation: fadeInUp 0.35s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 .import-page__back {
@@ -479,8 +483,12 @@ const fileSize = computed(() => {
   background: var(--bg-tertiary);
   color: var(--accent);
   cursor: pointer;
+  transition: background 0.2s, transform 0.15s;
 }
-.import-page__back:active { background: var(--bg-hover); }
+.import-page__back:active {
+  background: var(--bg-hover);
+  transform: scale(0.92);
+}
 
 .import-page__title {
   flex: 1;
@@ -500,8 +508,18 @@ const fileSize = computed(() => {
 }
 
 /* 步骤区块 */
-.step-section { display: flex; flex-direction: column; gap: 14px; }
-.step-section--center { justify-content: center; align-items: center; min-height: 50vh; gap: 12px; }
+.step-section {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  animation: fadeInUp 0.38s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.step-section--center {
+  justify-content: center;
+  align-items: center;
+  min-height: 50vh;
+  gap: 12px;
+}
 
 /* 拖拽上传区 */
 .drop-zone {
@@ -543,8 +561,8 @@ const fileSize = computed(() => {
 .file-info__detail { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 .file-info__name { font-size: 14px; font-weight: 500; color: var(--text-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .file-info__size { font-size: 11px; color: var(--text-tertiary); }
-.file-info__remove { width: 28px; height: 28px; border: none; background: var(--bg-tertiary); border-radius: 8px; cursor: pointer; display: flex; align-items: center; justify-content: center; color: var(--text-tertiary); flex-shrink: 0; }
-.file-info__remove:active { background: var(--danger-bg); color: var(--danger); }
+.file-info__remove { width: 28px; height: 28px; border: none; background: var(--bg-tertiary); border-radius: 8px; cursor: pointer; display: flex; align-items: center; justify-content: center; color: var(--text-tertiary); flex-shrink: 0; transition: background 0.15s, transform 0.15s; }
+.file-info__remove:active { background: var(--danger-bg); color: var(--danger); transform: scale(0.9); }
 
 /* 错误列表 */
 .error-list { display: flex; flex-direction: column; gap: 6px; }
@@ -589,6 +607,8 @@ const fileSize = computed(() => {
   background: var(--bg-secondary); border-radius: 14px;
   overflow: hidden; border: 1px solid var(--border-primary);
   transition: box-shadow 0.2s;
+  animation: fadeInUp 0.38s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation-delay: calc(var(--stagger-index, 0) * 0.04s);
 }
 .course-card:active { box-shadow: var(--shadow-card); }
 
@@ -610,7 +630,7 @@ const fileSize = computed(() => {
   cursor: pointer; display: flex; align-items: center; justify-content: center;
   color: var(--text-tertiary); transition: all 0.15s;
 }
-.course-card__delete:active { background: var(--danger-bg); color: var(--danger); }
+.course-card__delete:active { background: var(--danger-bg); color: var(--danger); transform: scale(0.9); }
 .course-card__arrow {
   color: var(--text-tertiary); transition: transform 0.25s; flex-shrink: 0;
 }
@@ -715,14 +735,16 @@ const fileSize = computed(() => {
   background: var(--accent-light); color: var(--accent); font-size: 12px;
   font-weight: 600; cursor: pointer; transition: all 0.15s;
 }
-.week-setting__apply:active { background: var(--accent); color: #fff; }
+.week-setting__apply:active { background: var(--accent); color: #fff; transform: scale(0.95); }
 
 /* 底部操作栏 */
 .import-page__footer {
   position: fixed; bottom: 0; left: 0; right: 0;
   display: flex; gap: 10px; padding: 12px 16px;
   padding-bottom: max(12px, env(safe-area-inset-bottom));
-  background: var(--bg-secondary); border-top: 1px solid var(--border-primary);
+  background: var(--glass-bg); border-top: 1px solid var(--glass-border);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
   z-index: 10;
 }
 .btn-cancel {
@@ -743,13 +765,18 @@ const fileSize = computed(() => {
 /* 弹窗 */
 .modal-overlay {
   position: fixed; inset: 0; background: var(--modal-overlay);
+  backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
   display: flex; align-items: center; justify-content: center; z-index: 100; padding: 0 16px;
 }
 .modal {
   background: var(--modal-bg); border-radius: 20px; padding: 20px 20px 24px;
-  width: 100%; max-width: 400px; animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  width: 100%; max-width: 400px; animation: modalSpringIn 0.4s cubic-bezier(0.16, 1, 0.3, 1);
 }
-@keyframes slideUp { from { transform: translateY(30px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+@keyframes modalSpringIn {
+  0% { transform: translateY(40px) scale(0.9); opacity: 0; }
+  60% { transform: translateY(-4px) scale(1.01); opacity: 1; }
+  100% { transform: translateY(0) scale(1); opacity: 1; }
+}
 .modal__handle {
   width: 36px; height: 4px; border-radius: 2px; background: var(--border-secondary); margin: 0 auto 16px;
 }

@@ -1,5 +1,5 @@
 <script setup>
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import { getCurrentWeekNumber, getWeekDateRange, formatDate } from '../utils/schedule'
 
 const props = defineProps({
@@ -9,6 +9,25 @@ const props = defineProps({
 const emit = defineEmits(['change'])
 
 const showWeekPicker = ref(false)
+
+const currentWeekNumber = computed(() => getCurrentWeekNumber())
+const isCurrentWeek = computed(() => props.weekNumber === currentWeekNumber.value)
+
+const dateRangeText = computed(() => {
+  const { monday, sunday } = getWeekDateRange(props.weekNumber)
+  return `${formatDate(monday)} - ${formatDate(sunday)}`
+})
+
+const weekOptions = computed(() => {
+  return Array.from({ length: 25 }, (_, index) => {
+    const week = index + 1
+    const { monday, sunday } = getWeekDateRange(week)
+    return {
+      week,
+      dateText: `${formatDate(monday)}-${formatDate(sunday)}`
+    }
+  })
+})
 
 function prevWeek() {
   if (props.weekNumber > 1) {
@@ -23,7 +42,8 @@ function nextWeek() {
 }
 
 function goToday() {
-  emit('change', getCurrentWeekNumber())
+  emit('change', currentWeekNumber.value)
+  showWeekPicker.value = false
 }
 
 function selectWeek(week) {
@@ -34,63 +54,53 @@ function selectWeek(week) {
 function openWeekPicker() {
   showWeekPicker.value = true
 }
-
-function getDateRangeText() {
-  const { monday, sunday } = getWeekDateRange(props.weekNumber)
-  return `${formatDate(monday)} - ${formatDate(sunday)}`
-}
-
-function isCurrentWeek() {
-  return props.weekNumber === getCurrentWeekNumber()
-}
-
-function getWeekShortDate(week) {
-  const { monday, sunday } = getWeekDateRange(week)
-  return `${monday.getMonth() + 1}.${monday.getDate()}-${sunday.getMonth() + 1}.${sunday.getDate()}`
-}
 </script>
 
 <template>
   <div class="week-selector">
-    <button class="week-selector__btn" :disabled="weekNumber <= 1" @click="prevWeek">
+    <button class="week-selector__btn" :disabled="weekNumber <= 1" title="上一周" @click="prevWeek">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
     </button>
+
     <div class="week-selector__info" @click="openWeekPicker">
       <span class="week-selector__week">第{{ weekNumber }}周</span>
-      <span class="week-selector__date">{{ getDateRangeText() }}</span>
-      <span v-if="!isCurrentWeek()" class="week-selector__today">回本周</span>
+      <span class="week-selector__date">{{ dateRangeText }}</span>
+      <button v-if="!isCurrentWeek" class="week-selector__today" type="button" @click.stop="goToday">回本周</button>
     </div>
-    <button class="week-selector__btn" :disabled="weekNumber >= 25" @click="nextWeek">
+
+    <button class="week-selector__btn" :disabled="weekNumber >= 25" title="下一周" @click="nextWeek">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
     </button>
 
-    <!-- 周数快速选择弹窗 -->
-    <Transition name="modal">
-      <div v-if="showWeekPicker" class="week-picker-overlay" @click.self="showWeekPicker = false">
-        <div class="week-picker">
-          <div class="week-picker__handle"></div>
-          <div class="week-picker__header">
-            <span class="week-picker__title">选择周次</span>
-            <button class="week-picker__today-btn" @click="selectWeek(getCurrentWeekNumber())">回到本周</button>
-          </div>
-          <div class="week-picker__grid">
-            <button
-              v-for="w in 25"
-              :key="w"
-              class="week-picker__item"
-              :class="{
-                'week-picker__item--active': w === weekNumber,
-                'week-picker__item--current': w === getCurrentWeekNumber()
-              }"
-              @click="selectWeek(w)"
-            >
-              <span class="week-picker__num">{{ w }}</span>
-              <span class="week-picker__date">{{ getWeekShortDate(w) }}</span>
-            </button>
+    <Teleport to="body">
+      <Transition name="modal">
+        <div v-if="showWeekPicker" class="week-picker-overlay" @click.self="showWeekPicker = false">
+          <div class="week-picker">
+            <div class="week-picker__handle"></div>
+            <div class="week-picker__header">
+              <span class="week-picker__title">选择周次</span>
+              <button class="week-picker__today-btn" type="button" @click="goToday">回到本周</button>
+            </div>
+            <div class="week-picker__grid">
+              <button
+                v-for="option in weekOptions"
+                :key="option.week"
+                class="week-picker__item"
+                :class="{
+                  'week-picker__item--active': option.week === weekNumber,
+                  'week-picker__item--current': option.week === currentWeekNumber
+                }"
+                type="button"
+                @click="selectWeek(option.week)"
+              >
+                <span class="week-picker__num">{{ option.week }}</span>
+                <span class="week-picker__date">{{ option.dateText }}</span>
+              </button>
+            </div>
           </div>
         </div>
-      </div>
-    </Transition>
+      </Transition>
+    </Teleport>
   </div>
 </template>
 
@@ -101,8 +111,13 @@ function getWeekShortDate(week) {
   justify-content: center;
   gap: 12px;
   padding: 8px 16px;
-  background: var(--bg-secondary);
-  border-bottom: 1px solid var(--border-primary);
+  background: var(--glass-bg);
+  backdrop-filter: blur(18px) saturate(170%);
+  -webkit-backdrop-filter: blur(18px) saturate(170%);
+  border-bottom: 1px solid var(--glass-border);
+  animation: fadeInUp 0.4s cubic-bezier(0.22, 1, 0.36, 1) 0.04s both;
+  position: relative;
+  z-index: 8;
 }
 
 .week-selector__btn {
@@ -135,6 +150,7 @@ function getWeekShortDate(week) {
   gap: 1px;
   cursor: pointer;
   position: relative;
+  min-width: 104px;
   padding: 4px 12px;
   border-radius: 10px;
   transition: background 0.15s;
@@ -157,17 +173,23 @@ function getWeekShortDate(week) {
 }
 
 .week-selector__today {
-  font-size: 10px;
-  color: var(--accent);
-  font-weight: 600;
   margin-top: 1px;
+  padding: 1px 6px;
+  border: none;
+  border-radius: 999px;
+  background: var(--accent-light);
+  color: var(--accent);
+  font-size: 10px;
+  font-weight: 600;
+  cursor: pointer;
 }
 
-/* ========== 周数选择弹窗 ========== */
 .week-picker-overlay {
   position: fixed;
   inset: 0;
   background: var(--modal-overlay);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
   display: flex;
   align-items: flex-end;
   justify-content: center;
@@ -182,7 +204,7 @@ function getWeekShortDate(week) {
   max-width: 480px;
   max-height: 70vh;
   overflow: auto;
-  animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  animation: modalSpringIn 0.34s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .week-picker__handle {
@@ -234,12 +256,13 @@ function getWeekShortDate(week) {
   flex-direction: column;
   align-items: center;
   gap: 2px;
+  min-height: 50px;
   padding: 8px 4px;
   border: 1.5px solid var(--border-secondary);
   border-radius: 10px;
   background: var(--bg-secondary);
   cursor: pointer;
-  transition: all 0.15s;
+  transition: background 0.15s, border-color 0.15s, transform 0.15s;
 }
 
 .week-picker__item:active {
@@ -269,21 +292,29 @@ function getWeekShortDate(week) {
   font-size: 8px;
   color: var(--text-tertiary);
   font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 
 .week-picker__item--active .week-picker__date {
-  color: rgba(255,255,255,0.8);
+  color: rgba(255, 255, 255, 0.8);
 }
 
 .week-picker__item--current:not(.week-picker__item--active) .week-picker__num {
   color: var(--accent);
 }
 
-@keyframes slideUp {
-  from { transform: translateY(100%); opacity: 0; }
-  to { transform: translateY(0); opacity: 1; }
+@keyframes modalSpringIn {
+  0% { transform: translateY(40px); opacity: 0; }
+  100% { transform: translateY(0); opacity: 1; }
 }
 
-.modal-enter-active, .modal-leave-active { transition: opacity 0.2s ease; }
-.modal-enter-from, .modal-leave-to { opacity: 0; }
+.modal-enter-active,
+.modal-leave-active {
+  transition: opacity 0.2s ease;
+}
+
+.modal-enter-from,
+.modal-leave-to {
+  opacity: 0;
+}
 </style>

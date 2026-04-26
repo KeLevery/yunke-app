@@ -4,26 +4,21 @@ import { useRouter } from 'vue-router'
 import WeekSelector from '../components/WeekSelector.vue'
 import CourseCard from '../components/CourseCard.vue'
 import EmptyState from '../components/EmptyState.vue'
-import { loadCourses, saveCourses, loadPeriods, loadCellHeight } from '../utils/storage'
-import { getCurrentWeekNumber, getCoursesForDay, DEFAULT_PERIODS, WEEK_DAYS, getWeekDateRange } from '../utils/schedule'
-
-const props = defineProps({
-  darkMode: Boolean
-})
+import { useCourses } from '../composables/useCourses'
+import { usePeriods } from '../composables/usePeriods'
+import { useTheme } from '../composables/useTheme'
+import { loadCellHeight } from '../utils/storage'
+import { getCurrentWeekNumber, getCoursesForDay, WEEK_DAYS, getWeekDateRange } from '../utils/schedule'
 
 const emit = defineEmits(['toggleDark'])
 
 const router = useRouter()
-const allCourses = ref([])
+const { courses } = useCourses()
+const { periods } = usePeriods()
+const { darkMode } = useTheme()
 const weekNumber = ref(getCurrentWeekNumber())
-const periods = ref(DEFAULT_PERIODS)
 
 onMounted(() => {
-  allCourses.value = loadCourses() || []
-  const customPeriods = loadPeriods()
-  if (customPeriods) {
-    periods.value = customPeriods
-  }
   updateCellHeight()
   window.addEventListener('resize', updateCellHeight)
 })
@@ -66,7 +61,7 @@ const isCurrentWeek = computed(() => weekNumber.value === getCurrentWeekNumber()
 
 const weekCourses = computed(() => {
   return WEEK_DAYS.map((_, dayIndex) => {
-    return getCoursesForDay(allCourses.value, weekNumber.value, dayIndex + 1)
+    return getCoursesForDay(courses.value, weekNumber.value, dayIndex + 1)
   })
 })
 
@@ -136,6 +131,7 @@ function getCoursePosition(course) {
   return { top, height }
 }
 
+// ========== 滑动手势 + 动画 ==========
 let touchStartX = 0
 let touchStartY = 0
 
@@ -155,6 +151,7 @@ function onTouchEnd(e) {
     }
   }
 }
+
 </script>
 
 <template>
@@ -181,7 +178,11 @@ function onTouchEnd(e) {
 
     <WeekSelector :week-number="weekNumber" @change="onWeekChange" />
 
-    <div class="timetable" @touchstart="onTouchStart" @touchend="onTouchEnd">
+    <div
+      class="timetable"
+      @touchstart="onTouchStart"
+      @touchend="onTouchEnd"
+    >
       <!-- 表头 -->
       <div class="timetable__header">
         <div class="timetable__header-time"></div>
@@ -286,7 +287,7 @@ function onTouchEnd(e) {
           <line x1="3" y1="12" x2="3.01" y2="12"/>
           <line x1="3" y1="18" x2="3.01" y2="18"/>
         </svg>
-        <span>列表</span>
+        <span>今日</span>
       </button>
     </nav>
   </div>
@@ -308,8 +309,12 @@ function onTouchEnd(e) {
   justify-content: space-between;
   padding: 8px 12px;
   padding-top: max(8px, env(safe-area-inset-top));
-  background: var(--bg-secondary);
+  background: var(--glass-bg);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border-bottom: 1px solid var(--glass-border);
   flex-shrink: 0;
+  animation: fadeInUp 0.4s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 .week-view__brand {
@@ -348,11 +353,31 @@ function onTouchEnd(e) {
   background: var(--bg-tertiary);
   color: var(--text-secondary);
   cursor: pointer;
-  transition: background 0.2s;
+  transition: background 0.2s, transform 0.2s;
+  position: relative;
+  overflow: hidden;
 }
 
 .week-view__icon-btn:active {
   background: var(--bg-hover);
+  transform: scale(0.9);
+}
+
+/* 按钮涟漪效果 */
+.week-view__icon-btn::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle, var(--accent) 10%, transparent 10.01%);
+  transform: scale(0);
+  opacity: 0;
+  transition: transform 0.4s ease, opacity 0.4s ease;
+  border-radius: inherit;
+}
+.week-view__icon-btn:active::after {
+  transform: scale(3);
+  opacity: 0.08;
+  transition: 0s;
 }
 
 /* 课表区域 */
@@ -362,6 +387,7 @@ function onTouchEnd(e) {
   -webkit-overflow-scrolling: touch;
   background: var(--bg-secondary);
   min-height: 0; /* 防止 flex 子项溢出 */
+  animation: fadeInUp 0.42s cubic-bezier(0.22, 1, 0.36, 1) 0.08s both;
 }
 
 .timetable__header {
@@ -493,12 +519,14 @@ function onTouchEnd(e) {
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  transition: background 0.15s;
+  transition: background 0.15s, transform 0.12s, box-shadow 0.15s;
   color: var(--text-placeholder);
 }
 
 .timetable__cell:not(.timetable__cell--occupied):active {
   background: var(--accent-light);
+  transform: scale(0.96);
+  box-shadow: inset 0 0 0 1px rgba(74, 144, 217, 0.15);
 }
 
 .timetable__cell--occupied {
@@ -515,14 +543,6 @@ function onTouchEnd(e) {
   opacity: 1;
 }
 
-.timetable__course-wrapper {
-  position: absolute;
-  left: 1px;
-  right: 1px;
-  z-index: 5;
-  cursor: pointer;
-}
-
 /* 底部导航 */
 .bottom-nav {
   display: flex;
@@ -530,25 +550,13 @@ function onTouchEnd(e) {
   justify-content: space-around;
   padding: 4px 16px;
   padding-bottom: max(4px, env(safe-area-inset-bottom));
-  background: var(--bg-secondary);
-  border-top: 1px solid var(--border-primary);
+  background: var(--glass-bg);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border-top: 1px solid var(--glass-border);
   flex-shrink: 0;
   position: relative;
   z-index: 10;
-}
-
-.bottom-nav__item {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 2px;
-  background: none;
-  border: none;
-  color: var(--text-tertiary);
-  font-size: 10px;
-  cursor: pointer;
-  padding: 6px 16px;
-  transition: color 0.2s;
 }
 
 .bottom-nav__item--active {
@@ -575,5 +583,47 @@ function onTouchEnd(e) {
 .bottom-nav__add:active {
   transform: scale(0.92);
   box-shadow: 0 1px 6px rgba(74, 144, 217, 0.2);
+}
+
+/* ========== 课程卡片入场动画 ========== */
+.timetable__course-wrapper {
+  position: absolute;
+  left: 1px;
+  right: 1px;
+  z-index: 5;
+  cursor: pointer;
+  animation: courseCardIn 0.4s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes courseCardIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* 底部导航项动画 */
+.bottom-nav__item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  background: none;
+  border: none;
+  color: var(--text-tertiary);
+  font-size: 10px;
+  cursor: pointer;
+  padding: 6px 16px;
+  border-radius: 12px;
+  transition: color 0.2s, transform 0.15s, background 0.2s;
+}
+
+.bottom-nav__item:active {
+  transform: scale(0.9);
+  background: var(--bg-tertiary);
 }
 </style>

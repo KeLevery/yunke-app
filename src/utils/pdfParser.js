@@ -13,13 +13,14 @@
  */
 
 import * as pdfjs from 'pdfjs-dist'
+import pdfWorkerSrc from 'pdfjs-dist/build/pdf.worker.min.mjs?url'
 import { COURSE_COLORS } from './schedule'
 
-pdfjs.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.0.379/pdf.worker.min.mjs'
+pdfjs.GlobalWorkerOptions.workerSrc = pdfWorkerSrc
 
-const CMAP_URL = 'https://unpkg.com/pdfjs-dist@4.0.379/cmaps/'
+const CMAP_URL = '/cmaps/'
 const CMAP_PACKED = true
-const STANDARD_FONT_DATA_URL = 'https://unpkg.com/pdfjs-dist@4.0.379/standard_fonts/'
+const STANDARD_FONT_DATA_URL = '/standard_fonts/'
 
 const DAY_KEYWORDS = {
   '周一': 1, '星期一': 1,

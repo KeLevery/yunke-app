@@ -1,6 +1,5 @@
 <script setup>
-import { inject } from 'vue'
-import { DEFAULT_PERIODS } from '../utils/schedule'
+import { usePeriods } from '../composables/usePeriods'
 
 const props = defineProps({
   course: { type: Object, required: true }
@@ -8,12 +7,10 @@ const props = defineProps({
 
 const emit = defineEmits(['click'])
 
-const periods = inject('periods', DEFAULT_PERIODS)
+const { getTimeRange: getTimeRangeUtil } = usePeriods()
 
 function getTimeRange(course) {
-  const start = periods.find(p => p.period === course.startPeriod)
-  const end = periods.find(p => p.period === course.endPeriod)
-  return start && end ? `${start.start}-${end.end}` : ''
+  return getTimeRangeUtil(course.startPeriod, course.endPeriod)
 }
 </script>
 
@@ -49,11 +46,41 @@ function getTimeRange(course) {
   gap: 1px;
   line-height: 1.3;
   min-height: 0;
-  transition: background 0.12s ease;
+  position: relative;
+  isolation: isolate;
+  transition: background 0.16s ease, transform 0.16s ease, box-shadow 0.16s ease;
+  animation: courseCardIn 0.3s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.course-card::after {
+  content: '';
+  position: absolute;
+  inset: -20%;
+  background: radial-gradient(circle, var(--card-color-mid) 0%, transparent 62%);
+  transform: scale(0);
+  opacity: 0;
+  transition: transform 0.35s ease, opacity 0.35s ease;
+  pointer-events: none;
+  z-index: 0;
+}
+
+@media (hover: hover) {
+  .course-card:hover {
+    background: var(--card-color-mid);
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-card);
+  }
 }
 
 .course-card:active {
   background: var(--card-color-mid);
+  transform: scale(0.97);
+}
+
+.course-card:active::after {
+  transform: scale(1);
+  opacity: 0.55;
+  transition: 0s;
 }
 
 .course-card__name {
@@ -92,5 +119,23 @@ function getTimeRange(course) {
   white-space: nowrap;
   flex: 0 0 auto;
   min-height: 0;
+}
+
+.course-card__name,
+.course-card__location,
+.course-card__teacher {
+  position: relative;
+  z-index: 1;
+}
+
+@keyframes courseCardIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
 }
 </style>

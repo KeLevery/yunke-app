@@ -3,6 +3,7 @@ const HISTORY_KEY = 'timetable_history'
 const PERIODS_KEY = 'timetable_periods'
 const SEMESTER_START_KEY = 'timetable_semester_start'
 const CELL_HEIGHT_KEY = 'timetable_cell_height'
+export const COURSES_CHANGED_EVENT = 'yunke:courses-changed'
 
 // ========== 课程数据 ==========
 
@@ -17,6 +18,9 @@ export function loadCourses() {
 
 export function saveCourses(courses) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(courses))
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent(COURSES_CHANGED_EVENT, { detail: courses }))
+  }
 }
 
 export function addCourse(course) {
@@ -67,9 +71,9 @@ export function generateId() {
 export function loadHistory() {
   try {
     const data = localStorage.getItem(HISTORY_KEY)
-    return data ? JSON.parse(data) : { location: [], teacher: [] }
+    return data ? JSON.parse(data) : { name: [], location: [], teacher: [] }
   } catch {
-    return { location: [], teacher: [] }
+    return { name: [], location: [], teacher: [] }
   }
 }
 
@@ -87,6 +91,16 @@ export function addHistoryItem(type, value) {
   list.unshift(value.trim())
   // 最多保留 20 条
   if (list.length > 20) list.pop()
+  history[type] = list
+  saveHistory(history)
+}
+
+export function removeHistoryItem(type, value) {
+  const history = loadHistory()
+  const list = history[type] || []
+  const idx = list.indexOf(value)
+  if (idx === -1) return
+  list.splice(idx, 1)
   history[type] = list
   saveHistory(history)
 }

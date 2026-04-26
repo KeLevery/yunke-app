@@ -1,7 +1,7 @@
 import { Capacitor } from '@capacitor/core'
 import { LocalNotifications } from '@capacitor/local-notifications'
 import { loadCourses, loadPeriods } from './storage'
-import { getCurrentWeekNumber, DEFAULT_PERIODS } from './schedule'
+import { getCurrentWeekNumber, getWeekNumberForDate, DEFAULT_PERIODS } from './schedule'
 
 const NOTIFICATION_ENABLED_KEY = 'yunke_notification_enabled'
 const NOTIFICATION_MINUTES_KEY = 'yunke_notification_minutes'
@@ -154,22 +154,21 @@ async function scheduleNativeNotifications() {
 
   const courses = loadCourses() || []
   const periods = loadPeriods() || DEFAULT_PERIODS
-  const weekNumber = getCurrentWeekNumber()
   const advanceMinutes = getNotificationMinutes()
   const now = new Date()
 
   const notifications = []
-  const todayDayOfWeek = now.getDay() === 0 ? 7 : now.getDay()
 
   // 只为当天及之后7天的课程安排通知（避免过多通知）
   for (let dayOffset = 0; dayOffset < 7; dayOffset++) {
     const targetDate = new Date(now)
     targetDate.setDate(now.getDate() + dayOffset)
     const targetDayOfWeek = targetDate.getDay() === 0 ? 7 : targetDate.getDay()
+    const targetWeekNumber = getWeekNumberForDate(targetDate)
 
     const dayCourses = courses.filter(c =>
       c.dayOfWeek === targetDayOfWeek &&
-      c.weeks && c.weeks.includes(weekNumber)
+      c.weeks && c.weeks.includes(targetWeekNumber)
     )
 
     for (const course of dayCourses) {

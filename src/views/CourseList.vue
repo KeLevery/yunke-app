@@ -1,29 +1,24 @@
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
-import { loadCourses, deleteCourse, loadPeriods } from '../utils/storage'
-import { WEEK_DAYS, DEFAULT_PERIODS, COURSE_COLORS, getCurrentWeekNumber, getCoursesForDay } from '../utils/schedule'
+import { useCourses } from '../composables/useCourses'
+import { usePeriods } from '../composables/usePeriods'
+import { WEEK_DAYS, COURSE_COLORS, getCurrentWeekNumber, getCoursesForDay } from '../utils/schedule'
 
 const router = useRouter()
-const allCourses = ref([])
-const periods = ref([...DEFAULT_PERIODS])
+const { courses, deleteCourse: deleteCourseAction } = useCourses()
+const { getTimeRange, getPeriodLabel } = usePeriods()
 const showDeleteModal = ref(false)
 const deleteTarget = ref(null)
 const weekNumber = ref(getCurrentWeekNumber())
 const selectedDay = ref(new Date().getDay() || 7)
+const dayTransitionName = ref('day-slide-left')
 
-onMounted(() => {
-  refreshCourses()
-  const custom = loadPeriods()
-  if (custom) periods.value = custom
-})
-
-function refreshCourses() {
-  allCourses.value = loadCourses() || []
-}
+let touchStartX = 0
+let touchStartY = 0
 
 const todayCourses = computed(() => {
-  return getCoursesForDay(allCourses.value, weekNumber.value, selectedDay.value)
+  return getCoursesForDay(courses.value, weekNumber.value, selectedDay.value)
 })
 
 const isToday = computed(() => {
@@ -39,22 +34,44 @@ function getDayName(day) {
   return WEEK_DAYS[day - 1] || ''
 }
 
-function getTimeRange(start, end) {
-  const s = periods.value.find(p => p.period === start)
-  const e = periods.value.find(p => p.period === end)
-  return s && e ? `${s.start}-${e.end}` : ''
+
+function shiftDay(offset) {
+  const current = selectedDay.value
+  const next = ((current - 1 + offset + 7) % 7) + 1
+  dayTransitionName.value = offset > 0 ? 'day-slide-left' : 'day-slide-right'
+  selectedDay.value = next
 }
 
-function getPeriodLabel(start, end) {
-  return `${start}-${end}节`
+function onTouchStart(e) {
+  touchStartX = e.touches[0].clientX
+  touchStartY = e.touches[0].clientY
+}
+
+function onTouchEnd(e) {
+  const diffX = e.changedTouches[0].clientX - touchStartX
+  const diffY = e.changedTouches[0].clientY - touchStartY
+
+  if (Math.abs(diffX) > 50 && Math.abs(diffX) > Math.abs(diffY)) {
+    if (diffX < 0) {
+      shiftDay(1)
+    } else {
+      shiftDay(-1)
+    }
+  }
 }
 
 function selectDay(day) {
+  if (day === selectedDay.value) return
+  dayTransitionName.value = day > selectedDay.value ? 'day-slide-left' : 'day-slide-right'
   selectedDay.value = day
 }
 
 function goToday() {
-  selectedDay.value = new Date().getDay() || 7
+  const today = new Date().getDay() || 7
+  if (selectedDay.value !== today) {
+    dayTransitionName.value = today > selectedDay.value ? 'day-slide-left' : 'day-slide-right'
+  }
+  selectedDay.value = today
   weekNumber.value = getCurrentWeekNumber()
 }
 
@@ -78,8 +95,7 @@ function cancelDelete() {
 
 function doDelete() {
   if (deleteTarget.value) {
-    deleteCourse(deleteTarget.value.id)
-    refreshCourses()
+    deleteCourseAction(deleteTarget.value.id)
   }
   showDeleteModal.value = false
   deleteTarget.value = null
@@ -117,53 +133,57 @@ function goBack() {
       <button v-if="!isToday" class="day-tabs__today" @click="goToday">今天</button>
     </div>
 
-    <div class="course-list__body">
-      <!-- 空状态 -->
-      <div v-if="todayCourses.length === 0" class="course-list__empty">
-        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-          <polyline points="14 2 14 8 20 8"/>
-          <line x1="16" y1="13" x2="8" y2="13"/>
-          <line x1="16" y1="17" x2="8" y2="17"/>
-        </svg>
-        <p>{{ getDayName(selectedDay) }}没有课程</p>
-        <button class="course-list__empty-add" @click="addCourse">添加课程</button>
-      </div>
-
-      <!-- 课程列表 -->
-      <TransitionGroup name="list" tag="div" class="course-list__items">
-        <div
-          v-for="course in todayCourses"
-          :key="course.id"
-          class="course-item"
-          :style="{ '--item-color': course.color }"
-        >
-          <div class="course-item__time-col">
-            <span class="course-item__period">{{ getPeriodLabel(course.startPeriod, course.endPeriod) }}</span>
-            <span class="course-item__time">{{ getTimeRange(course.startPeriod, course.endPeriod) }}</span>
-          </div>
-          <div class="course-item__color-bar"></div>
-          <div class="course-item__content" @click="editCourse(course.id)">
-            <div class="course-item__name">{{ course.name }}</div>
-            <div class="course-item__detail">
-              <span v-if="course.location">
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
-                {{ course.location }}
-              </span>
-              <span v-if="course.teacher">
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-                {{ course.teacher }}
-              </span>
-            </div>
-          </div>
-          <button class="course-item__delete" @click.stop="confirmDelete(course)">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <polyline points="3 6 5 6 21 6"/>
-              <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+    <div class="course-list__body" @touchstart="onTouchStart" @touchend="onTouchEnd">
+      <Transition :name="dayTransitionName" mode="out-in">
+        <div :key="selectedDay" class="course-list__day-panel">
+          <!-- 空状态 -->
+          <div v-if="todayCourses.length === 0" class="course-list__empty">
+            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+              <polyline points="14 2 14 8 20 8"/>
+              <line x1="16" y1="13" x2="8" y2="13"/>
+              <line x1="16" y1="17" x2="8" y2="17"/>
             </svg>
-          </button>
+            <p>{{ getDayName(selectedDay) }}没有课程</p>
+            <button class="course-list__empty-add" @click="addCourse">添加课程</button>
+          </div>
+
+          <!-- 课程列表 -->
+          <TransitionGroup name="list" tag="div" class="course-list__items">
+            <div
+              v-for="(course, index) in todayCourses"
+              :key="course.id"
+              class="course-item"
+              :style="{ '--item-color': course.color, '--stagger-index': index }"
+            >
+              <div class="course-item__time-col">
+                <span class="course-item__period">{{ getPeriodLabel(course.startPeriod, course.endPeriod) }}</span>
+                <span class="course-item__time">{{ getTimeRange(course.startPeriod, course.endPeriod) }}</span>
+              </div>
+              <div class="course-item__color-bar"></div>
+              <div class="course-item__content" @click="editCourse(course.id)">
+                <div class="course-item__name">{{ course.name }}</div>
+                <div class="course-item__detail">
+                  <span v-if="course.location">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+                    {{ course.location }}
+                  </span>
+                  <span v-if="course.teacher">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                    {{ course.teacher }}
+                  </span>
+                </div>
+              </div>
+              <button class="course-item__delete" @click.stop="confirmDelete(course)">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <polyline points="3 6 5 6 21 6"/>
+                  <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                </svg>
+              </button>
+            </div>
+          </TransitionGroup>
         </div>
-      </TransitionGroup>
+      </Transition>
     </div>
 
     <Transition name="modal">
@@ -195,9 +215,12 @@ function goBack() {
   align-items: center;
   padding: 10px 16px;
   padding-top: max(10px, env(safe-area-inset-top));
-  background: var(--bg-secondary);
-  border-bottom: 1px solid var(--border-primary);
+  background: var(--glass-bg);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border-bottom: 1px solid var(--glass-border);
   gap: 12px;
+  animation: fadeInUp 0.35s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 .course-list__back {
@@ -211,6 +234,12 @@ function goBack() {
   background: var(--bg-tertiary);
   color: var(--accent);
   cursor: pointer;
+  transition: background 0.2s, transform 0.15s;
+}
+
+.course-list__back:active {
+  background: var(--bg-hover);
+  transform: scale(0.92);
 }
 
 .course-list__title {
@@ -232,6 +261,13 @@ function goBack() {
   background: var(--accent);
   color: #fff;
   cursor: pointer;
+  transition: transform 0.15s, box-shadow 0.2s;
+  box-shadow: 0 2px 8px rgba(74, 144, 217, 0.2);
+}
+
+.course-list__add-btn:active {
+  transform: scale(0.92);
+  box-shadow: 0 1px 4px rgba(74, 144, 217, 0.15);
 }
 
 /* 星期选择 */
@@ -239,10 +275,14 @@ function goBack() {
   display: flex;
   align-items: center;
   padding: 8px 12px;
-  background: var(--bg-secondary);
-  border-bottom: 1px solid var(--border-primary);
+  background: var(--glass-bg);
+  backdrop-filter: blur(18px) saturate(170%);
+  -webkit-backdrop-filter: blur(18px) saturate(170%);
+  border-bottom: 1px solid var(--glass-border);
   gap: 4px;
   position: relative;
+  z-index: 6;
+  animation: fadeInUp 0.4s cubic-bezier(0.22, 1, 0.36, 1) 0.05s both;
 }
 
 .day-tabs__item {
@@ -297,6 +337,39 @@ function goBack() {
   -webkit-overflow-scrolling: touch;
 }
 
+.course-list__day-panel {
+  min-height: 100%;
+  padding: 0;
+  will-change: transform;
+  transform: translateZ(0);
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+
+.day-slide-left-enter-active,
+.day-slide-left-leave-active,
+.day-slide-right-enter-active,
+.day-slide-right-leave-active {
+  transition: transform 0.22s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.day-slide-left-enter-from {
+  transform: translateX(24px);
+}
+
+.day-slide-left-leave-to {
+  transform: translateX(-24px);
+}
+
+.day-slide-right-enter-from {
+  transform: translateX(-24px);
+}
+
+.day-slide-right-leave-to {
+  transform: translateX(24px);
+}
+
+
 .course-list__empty {
   display: flex;
   flex-direction: column;
@@ -337,10 +410,12 @@ function goBack() {
   border-radius: 12px;
   overflow: hidden;
   box-shadow: var(--shadow-card);
-  transition: transform 0.2s;
+  transition: transform 0.2s, box-shadow 0.2s;
+  animation: fadeInUp 0.4s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation-delay: calc(var(--stagger-index, 0) * 0.04s);
 }
 
-.course-item:active { transform: scale(0.98); }
+.course-item:active { transform: scale(0.98); box-shadow: 0 1px 4px rgba(0,0,0,0.08); }
 
 .course-item__time-col {
   display: flex;
@@ -419,6 +494,8 @@ function goBack() {
   position: fixed;
   inset: 0;
   background: var(--modal-overlay);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -433,6 +510,13 @@ function goBack() {
   width: 100%;
   max-width: 320px;
   box-shadow: var(--shadow-elevated);
+  animation: modalSpringIn 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes modalSpringIn {
+  0% { transform: translateY(40px) scale(0.9); opacity: 0; }
+  60% { transform: translateY(-4px) scale(1.01); opacity: 1; }
+  100% { transform: translateY(0) scale(1); opacity: 1; }
 }
 
 .modal__title { font-size: 17px; font-weight: 700; color: var(--text-primary); margin-bottom: 8px; }
@@ -452,10 +536,12 @@ function goBack() {
 .modal__btn--cancel { background: var(--bg-tertiary); color: var(--text-secondary); }
 .modal__btn--danger { background: var(--danger); color: #fff; }
 
-.list-enter-active, .list-leave-active { transition: all 0.3s ease; }
-.list-enter-from { opacity: 0; transform: translateX(-20px); }
-.list-leave-to { opacity: 0; transform: translateX(20px); }
+.list-enter-active, .list-leave-active { transition: all 0.35s cubic-bezier(0.22, 1, 0.36, 1); }
+.list-enter-from { opacity: 0; transform: translateY(16px) scale(0.96); }
+.list-leave-to { opacity: 0; transform: translateX(30px) scale(0.96); }
+.list-move { transition: transform 0.35s cubic-bezier(0.22, 1, 0.36, 1); }
 
-.modal-enter-active, .modal-leave-active { transition: opacity 0.25s ease; }
+.modal-enter-active { transition: opacity 0.25s ease; }
+.modal-leave-active { transition: opacity 0.2s ease; }
 .modal-enter-from, .modal-leave-to { opacity: 0; }
 </style>

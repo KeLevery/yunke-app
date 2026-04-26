@@ -3,6 +3,7 @@ import { Capacitor } from '@capacitor/core'
 import { App as CapApp } from '@capacitor/app'
 import App from './App.vue'
 import router from './router'
+import { initNotifications } from './utils/notification'
 
 const app = createApp(App)
 app.use(router)
@@ -21,8 +22,6 @@ if (Capacitor.isNativePlatform()) {
 
   // 延迟初始化课前提醒通知，避免阻塞启动
   setTimeout(() => {
-    import('./utils/notification').then(({ initNotifications }) => {
-      initNotifications()
-    })
+    initNotifications()
   }, 2000)
 }
