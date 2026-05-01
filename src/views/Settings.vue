@@ -3,7 +3,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { Capacitor } from '@capacitor/core'
 import { loadPeriods, savePeriods, loadSemesterStart, saveSemesterStart, loadCourses, saveCourses, loadCellHeight, saveCellHeight } from '../utils/storage'
-import { DEFAULT_PERIODS } from '../utils/schedule'
+import { DEFAULT_PERIODS, createNextPeriod, renumberPeriods } from '../utils/schedule'
 import {
   isNotificationEnabled,
   setNotificationEnabled,
@@ -45,8 +45,17 @@ function updatePeriodTime(index, field, value) {
   periods.value[index][field] = value
 }
 
+function addPeriod() {
+  periods.value = [...periods.value, createNextPeriod(periods.value)]
+}
+
+function removeLastPeriod() {
+  if (periods.value.length <= 1) return
+  periods.value = renumberPeriods(periods.value.slice(0, -1))
+}
+
 function save() {
-  savePeriods(periods.value)
+  savePeriods(renumberPeriods(periods.value))
   saveSemesterStart(semesterStart.value)
   router.back()
 }
@@ -444,6 +453,13 @@ function cancelImport() {
         <div class="settings__hint" v-if="!showPeriods">点击展开修改每节课的上课时间</div>
         <Transition name="collapse">
           <div v-if="showPeriods" class="period-list">
+            <div class="period-list__tools">
+              <span class="period-list__count">共 {{ periods.length }} 节</span>
+              <div class="period-list__actions">
+                <button class="period-list__btn" @click="addPeriod">增加一节</button>
+                <button class="period-list__btn" :disabled="periods.length <= 1" @click="removeLastPeriod">删除最后一节</button>
+              </div>
+            </div>
             <div
               v-for="(p, idx) in periods"
               :key="idx"
@@ -675,8 +691,46 @@ function cancelImport() {
   gap: 8px;
 }
 
-.period-item {
+.period-list__tools {
   display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 2px 2px 4px;
+}
+
+.period-list__count {
+  font-size: 12px;
+  color: var(--text-tertiary);
+  white-space: nowrap;
+}
+
+.period-list__actions {
+  display: flex;
+  gap: 6px;
+  min-width: 0;
+}
+
+.period-list__btn {
+  padding: 6px 9px;
+  border: 1.5px solid var(--border-secondary);
+  border-radius: 8px;
+  background: var(--bg-secondary);
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.period-list__btn:disabled {
+  color: var(--text-placeholder);
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.period-item {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
   align-items: center;
   gap: 10px;
   background: var(--bg-secondary);
@@ -690,17 +744,21 @@ function cancelImport() {
   font-weight: 600;
   color: var(--text-secondary);
   min-width: 44px;
+  white-space: nowrap;
 }
 
 .period-item__times {
-  flex: 1;
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
   align-items: center;
   gap: 6px;
+  min-width: 0;
 }
 
 .period-item__input {
-  flex: 1;
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
   padding: 8px 10px;
   border: 1.5px solid var(--border-secondary);
   border-radius: 8px;
@@ -709,6 +767,7 @@ function cancelImport() {
   background: var(--bg-secondary);
   outline: none;
   font-variant-numeric: tabular-nums;
+  text-align: center;
 }
 
 .period-item__input:focus {
@@ -718,6 +777,55 @@ function cancelImport() {
 .period-item__sep {
   color: var(--text-placeholder);
   font-size: 14px;
+  line-height: 1;
+  text-align: center;
+}
+
+@media (max-width: 360px) {
+  .settings__body {
+    padding-inline: 12px;
+  }
+
+  .period-item {
+    gap: 8px;
+    padding: 10px 12px;
+  }
+
+  .period-list__tools {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .period-item__input {
+    padding-inline: 6px;
+    font-size: 13px;
+  }
+}
+
+@media (max-width: 340px) {
+  .period-item {
+    grid-template-columns: 40px minmax(0, 1fr);
+    gap: 6px;
+    padding-inline: 10px;
+  }
+
+  .period-item__num {
+    min-width: 0;
+    font-size: 12px;
+  }
+
+  .period-item__times {
+    gap: 4px;
+  }
+
+  .period-item__input {
+    padding-inline: 4px;
+    font-size: 12px;
+  }
+
+  .period-item__sep {
+    font-size: 12px;
+  }
 }
 
 .settings__footer {

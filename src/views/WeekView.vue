@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import WeekSelector from '../components/WeekSelector.vue'
 import CourseCard from '../components/CourseCard.vue'
@@ -8,7 +8,7 @@ import { useCourses } from '../composables/useCourses'
 import { usePeriods } from '../composables/usePeriods'
 import { useTheme } from '../composables/useTheme'
 import { loadCellHeight } from '../utils/storage'
-import { getCurrentWeekNumber, getCoursesForDay, WEEK_DAYS, getWeekDateRange } from '../utils/schedule'
+import { getCurrentWeekNumber, getCoursesForDay, WEEK_DAYS, getWeekDateRange, groupPeriodsByDayPart } from '../utils/schedule'
 
 const emit = defineEmits(['toggleDark'])
 
@@ -27,6 +27,10 @@ onBeforeUnmount(() => {
   window.removeEventListener('resize', updateCellHeight)
 })
 
+watch(() => periods.value.length, () => {
+  updateCellHeight()
+})
+
 // 动态计算单元格高度，适配不同屏幕
 const cellHeight = ref(100)
 const sectionGap = 8
@@ -38,9 +42,9 @@ function updateCellHeight() {
   const weekSel = 50  // 周选择器约50px
   const bottomNav = 56 // 底部导航约56px
   const header = 48   // 表头约48px
-  const available = vh - topBar - weekSel - bottomNav - header - sectionGap * 2
-  // 12节课，3个时间段，每个时间段4节
-  const h = Math.floor(available / 12)
+  const sectionCount = Math.max(1, timeSections.value.length)
+  const available = vh - topBar - weekSel - bottomNav - header - sectionGap * (sectionCount - 1)
+  const h = Math.floor(available / Math.max(1, periods.value.length))
   const autoHeight = Math.max(80, Math.min(200, h))
 
   // 优先使用用户自定义高度，但限制在80~200范围内
@@ -65,8 +69,8 @@ const weekCourses = computed(() => {
   })
 })
 
-const hasCourses = computed(() => {
-  return weekCourses.value.some(day => day.length > 0)
+const hasAnyCourses = computed(() => {
+  return courses.value.length > 0
 })
 
 const weekDates = computed(() => {
@@ -78,11 +82,7 @@ const weekDates = computed(() => {
   })
 })
 
-const timeSections = computed(() => [
-  { label: '上午', periods: periods.value.slice(0, 4) },
-  { label: '下午', periods: periods.value.slice(4, 8) },
-  { label: '晚上', periods: periods.value.slice(8, 12) }
-])
+const timeSections = computed(() => groupPeriodsByDayPart(periods.value))
 
 function onWeekChange(week) {
   weekNumber.value = week
@@ -111,23 +111,27 @@ function goToImport() {
   router.push('/import')
 }
 
-function isCellOccupied(dayIndex, periodIndex) {
+function isCellOccupied(dayIndex, periodNumber) {
   return weekCourses.value[dayIndex].some(c =>
-    periodIndex + 1 >= c.startPeriod && periodIndex + 1 <= c.endPeriod
+    periodNumber >= c.startPeriod && periodNumber <= c.endPeriod
   )
 }
 
 function getCoursePosition(course) {
   const ch = cellHeight.value
-  let sectionOffset = 0
-  if (course.startPeriod >= 9) {
-    sectionOffset = 2
-  } else if (course.startPeriod >= 5) {
-    sectionOffset = 1
-  }
-  const indexInSection = course.startPeriod - (sectionOffset * 4 + 1)
-  const top = sectionOffset * (ch * 4 + sectionGap) + indexInSection * ch
-  const height = (course.endPeriod - course.startPeriod + 1) * ch
+  const flatPeriods = periods.value
+  let startIndex = flatPeriods.findIndex(p => p.period === course.startPeriod)
+  let endIndex = flatPeriods.findIndex(p => p.period === course.endPeriod)
+  if (startIndex === -1) startIndex = Math.max(0, course.startPeriod - 1)
+  if (endIndex === -1) endIndex = Math.max(startIndex, course.endPeriod - 1)
+
+  const sectionStartIndexes = timeSections.value
+    .map(section => flatPeriods.findIndex(p => p.period === section.periods[0]?.period))
+    .filter(index => index > 0)
+  const gapsBefore = sectionStartIndexes.filter(index => index <= startIndex).length
+  const gapsInside = sectionStartIndexes.filter(index => index > startIndex && index <= endIndex).length
+  const top = startIndex * ch + gapsBefore * sectionGap
+  const height = (endIndex - startIndex + 1) * ch + gapsInside * sectionGap
   return { top, height }
 }
 
@@ -178,89 +182,91 @@ function onTouchEnd(e) {
 
     <WeekSelector :week-number="weekNumber" @change="onWeekChange" />
 
-    <div
-      class="timetable"
-      @touchstart="onTouchStart"
-      @touchend="onTouchEnd"
-    >
-      <!-- 表头 -->
-      <div class="timetable__header">
-        <div class="timetable__header-time"></div>
-        <div
-          v-for="(day, i) in WEEK_DAYS"
-          :key="i"
-          class="timetable__header-day"
-          :class="{ 'timetable__header-day--today': todayDayOfWeek === i + 1 && isCurrentWeek }"
-        >
-          <span class="timetable__day-label">{{ day }}</span>
-          <span
-            class="timetable__day-date"
-            :class="{ 'timetable__day-date--today': todayDayOfWeek === i + 1 && isCurrentWeek }"
-          >{{ weekDates[i] }}</span>
-        </div>
-      </div>
-
-      <!-- 课程区域 -->
-      <div class="timetable__body">
-        <!-- 左侧时间列 -->
-        <div class="timetable__time-col">
+    <div class="week-view__content">
+      <div
+        class="timetable"
+        @touchstart="onTouchStart"
+        @touchend="onTouchEnd"
+      >
+        <!-- 表头 -->
+        <div class="timetable__header">
+          <div class="timetable__header-time"></div>
           <div
-            v-for="section in timeSections"
-            :key="section.label"
-            class="timetable__time-section"
+            v-for="(day, i) in WEEK_DAYS"
+            :key="i"
+            class="timetable__header-day"
+            :class="{ 'timetable__header-day--today': todayDayOfWeek === i + 1 && isCurrentWeek }"
           >
-            <div
-              v-for="p in section.periods"
-              :key="p.period"
-              class="timetable__time-cell"
-            >
-              <span class="timetable__period-num">{{ p.period }}</span>
-              <span class="timetable__period-time">{{ p.start }}</span>
-              <span class="timetable__period-time">{{ p.end }}</span>
-            </div>
+            <span class="timetable__day-label">{{ day }}</span>
+            <span
+              class="timetable__day-date"
+              :class="{ 'timetable__day-date--today': todayDayOfWeek === i + 1 && isCurrentWeek }"
+            >{{ weekDates[i] }}</span>
           </div>
         </div>
 
-        <div class="timetable__grid">
-          <div
-            v-for="(day, dayIndex) in WEEK_DAYS"
-            :key="dayIndex"
-            class="timetable__day-col"
-            :class="{ 'timetable__day-col--today': todayDayOfWeek === dayIndex + 1 && isCurrentWeek }"
-          >
+        <!-- 课程区域 -->
+        <div class="timetable__body">
+          <!-- 左侧时间列 -->
+          <div class="timetable__time-col">
             <div
               v-for="section in timeSections"
               :key="section.label"
-              class="timetable__day-section"
+              class="timetable__time-section"
             >
               <div
                 v-for="p in section.periods"
                 :key="p.period"
-                class="timetable__cell"
-                :class="{ 'timetable__cell--occupied': isCellOccupied(dayIndex, p.period - 1) }"
-                @click="!isCellOccupied(dayIndex, p.period - 1) && goToAdd(dayIndex + 1, p.period)"
+                class="timetable__time-cell"
               >
-                <svg v-if="!isCellOccupied(dayIndex, p.period - 1)" class="timetable__cell-plus" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                <span class="timetable__period-num">{{ p.period }}</span>
+                <span class="timetable__period-time">{{ p.start }}</span>
+                <span class="timetable__period-time">{{ p.end }}</span>
               </div>
             </div>
+          </div>
+
+          <div class="timetable__grid">
             <div
-              v-for="course in weekCourses[dayIndex]"
-              :key="course.id"
-              class="timetable__course-wrapper"
-              :style="{
-                top: getCoursePosition(course).top + 'px',
-                height: getCoursePosition(course).height + 'px'
-              }"
-              @click="onCourseClick(course)"
+              v-for="(day, dayIndex) in WEEK_DAYS"
+              :key="dayIndex"
+              class="timetable__day-col"
+              :class="{ 'timetable__day-col--today': todayDayOfWeek === dayIndex + 1 && isCurrentWeek }"
             >
-              <CourseCard :course="course" />
+              <div
+                v-for="section in timeSections"
+                :key="section.label"
+                class="timetable__day-section"
+              >
+                <div
+                  v-for="p in section.periods"
+                  :key="p.period"
+                  class="timetable__cell"
+                  :class="{ 'timetable__cell--occupied': isCellOccupied(dayIndex, p.period) }"
+                  @click="!isCellOccupied(dayIndex, p.period) && goToAdd(dayIndex + 1, p.period)"
+                >
+                  <svg v-if="!isCellOccupied(dayIndex, p.period)" class="timetable__cell-plus" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                </div>
+              </div>
+              <div
+                v-for="course in weekCourses[dayIndex]"
+                :key="course.id"
+                class="timetable__course-wrapper"
+                :style="{
+                  top: getCoursePosition(course).top + 'px',
+                  height: getCoursePosition(course).height + 'px'
+                }"
+                @click="onCourseClick(course)"
+              >
+                <CourseCard :course="course" />
+              </div>
             </div>
           </div>
         </div>
       </div>
-    </div>
 
-    <EmptyState v-if="!hasCourses" @add="goToAdd()" />
+      <EmptyState v-if="!hasAnyCourses" class="week-view__empty" @add="goToAdd()" />
+    </div>
 
     <nav class="bottom-nav">
       <button class="bottom-nav__item bottom-nav__item--active">
@@ -380,14 +386,36 @@ function onTouchEnd(e) {
   transition: 0s;
 }
 
+.week-view__content {
+  flex: 1;
+  min-height: 0;
+  position: relative;
+  background: var(--bg-secondary);
+}
+
 /* 课表区域 */
 .timetable {
-  flex: 1;
+  height: 100%;
   overflow: auto;
   -webkit-overflow-scrolling: touch;
   background: var(--bg-secondary);
-  min-height: 0; /* 防止 flex 子项溢出 */
   animation: fadeInUp 0.42s cubic-bezier(0.22, 1, 0.36, 1) 0.08s both;
+}
+
+.week-view__empty {
+  position: absolute;
+  left: 44px;
+  right: 0;
+  bottom: 0;
+  min-height: clamp(220px, 34%, 320px);
+  padding: 32px 18px calc(28px + env(safe-area-inset-bottom));
+  background: linear-gradient(180deg, transparent 0%, var(--bg-secondary) 22%, var(--bg-secondary) 100%);
+  pointer-events: none;
+  z-index: 8;
+}
+
+.week-view__empty :deep(.empty-state__btn) {
+  pointer-events: auto;
 }
 
 .timetable__header {

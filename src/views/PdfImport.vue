@@ -2,8 +2,8 @@
 import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { parsePdfTimetable } from '../utils/pdfParser'
-import { saveCourses, loadCourses, addCourse } from '../utils/storage'
-import { WEEK_DAYS, COURSE_COLORS } from '../utils/schedule'
+import { saveCourses, loadCourses, addCourse, loadPeriods } from '../utils/storage'
+import { WEEK_DAYS, COURSE_COLORS, DEFAULT_PERIODS } from '../utils/schedule'
 
 const router = useRouter()
 
@@ -17,6 +17,7 @@ const errors = ref([])
 const dragOver = ref(false)
 const rawText = ref('')
 const showRawText = ref(false)
+const periods = ref(loadPeriods() || [...DEFAULT_PERIODS])
 
 // 周次设置
 const defaultWeeks = ref(Array.from({ length: 16 }, (_, i) => i + 1))
@@ -355,11 +356,11 @@ const fileSize = computed(() => {
                     <label class="form-label">节次</label>
                     <div class="period-range">
                       <select class="form-select form-select--sm" v-model="parsedCourses[index].startPeriod">
-                        <option v-for="p in 12" :key="p" :value="p">{{ p }}</option>
+                        <option v-for="p in periods" :key="p.period" :value="p.period">{{ p.period }}</option>
                       </select>
                       <span class="period-sep">—</span>
                       <select class="form-select form-select--sm" v-model="parsedCourses[index].endPeriod">
-                        <option v-for="p in 12" :key="p" :value="p" :disabled="p < parsedCourses[index].startPeriod">{{ p }}</option>
+                        <option v-for="p in periods" :key="p.period" :value="p.period" :disabled="p.period < parsedCourses[index].startPeriod">{{ p.period }}</option>
                       </select>
                     </div>
                   </div>

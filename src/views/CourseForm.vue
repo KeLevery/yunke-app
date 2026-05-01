@@ -2,7 +2,7 @@
 import { ref, computed, onMounted, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { addCourse, updateCourse, getCourseById, deleteCourse, getHistory, addHistoryItem, loadPeriods, savePeriods, removeHistoryItem as removeHistoryFromStorage } from '../utils/storage'
-import { WEEK_DAYS, DEFAULT_PERIODS, COURSE_COLORS } from '../utils/schedule'
+import { WEEK_DAYS, DEFAULT_PERIODS, COURSE_COLORS, createNextPeriod, renumberPeriods } from '../utils/schedule'
 
 const router = useRouter()
 const route = useRoute()
@@ -78,12 +78,31 @@ function confirmWeeks() { showWeekModal.value = false }
 function openPeriodModal() { showPeriodModal.value = true }
 
 function savePeriodSettings() {
+  periods.value = renumberPeriods(periods.value)
   savePeriods(periods.value)
+  normalizeSelectedPeriodBounds()
   showPeriodModal.value = false
 }
 
 function updatePeriodTime(index, field, value) {
   periods.value[index][field] = value
+}
+
+function addPeriod() {
+  periods.value = [...periods.value, createNextPeriod(periods.value)]
+}
+
+function removeLastPeriod() {
+  if (periods.value.length <= 1) return
+  periods.value = renumberPeriods(periods.value.slice(0, -1))
+  normalizeSelectedPeriodBounds()
+}
+
+function normalizeSelectedPeriodBounds() {
+  const maxPeriod = periods.value[periods.value.length - 1]?.period || 1
+  if (form.value.startPeriod > maxPeriod) form.value.startPeriod = maxPeriod
+  if (form.value.endPeriod > maxPeriod) form.value.endPeriod = maxPeriod
+  if (form.value.endPeriod < form.value.startPeriod) form.value.endPeriod = form.value.startPeriod
 }
 
 function save() {
@@ -344,6 +363,13 @@ const hasHistory = (field) => (history.value[field] || []).length > 0
           <div class="modal__handle"></div>
           <div class="modal__title">自定义上课时间</div>
           <div class="period-edit-list">
+            <div class="period-edit-tools">
+              <span class="period-edit-tools__count">共 {{ periods.length }} 节</span>
+              <div class="period-edit-tools__actions">
+                <button class="period-edit-tools__btn" @click="addPeriod">增加一节</button>
+                <button class="period-edit-tools__btn" :disabled="periods.length <= 1" @click="removeLastPeriod">删除最后一节</button>
+              </div>
+            </div>
             <div v-for="(p, idx) in periods" :key="idx" class="period-edit-item">
               <span class="period-edit-item__num">第{{ p.period }}节</span>
               <div class="period-edit-item__times">
@@ -796,10 +822,15 @@ const hasHistory = (field) => (history.value[field] || []).length > 0
 .modal__confirm-btn:active { background: var(--accent-hover); }
 
 .period-edit-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px; max-height: 50vh; overflow: auto; }
-.period-edit-item { display: flex; align-items: center; gap: 10px; }
-.period-edit-item__num { font-size: 13px; font-weight: 600; color: var(--text-secondary); min-width: 44px; }
-.period-edit-item__times { flex: 1; display: flex; align-items: center; gap: 6px; }
-.period-edit-item__input { flex: 1; padding: 6px 8px; border: 1.5px solid var(--border-secondary); border-radius: 8px; font-size: 13px; color: var(--text-primary); background: var(--bg-secondary); outline: none; font-variant-numeric: tabular-nums; }
+.period-edit-tools { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 0 2px 4px; }
+.period-edit-tools__count { font-size: 12px; color: var(--text-tertiary); white-space: nowrap; }
+.period-edit-tools__actions { display: flex; gap: 6px; min-width: 0; }
+.period-edit-tools__btn { padding: 6px 9px; border: 1.5px solid var(--border-secondary); border-radius: 8px; background: var(--bg-secondary); color: var(--accent); font-size: 12px; font-weight: 600; cursor: pointer; }
+.period-edit-tools__btn:disabled { color: var(--text-placeholder); cursor: not-allowed; opacity: 0.55; }
+.period-edit-item { display: grid; grid-template-columns: max-content minmax(0, 1fr); align-items: center; gap: 10px; }
+.period-edit-item__num { font-size: 13px; font-weight: 600; color: var(--text-secondary); min-width: 44px; white-space: nowrap; }
+.period-edit-item__times { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: 6px; min-width: 0; }
+.period-edit-item__input { width: 100%; min-width: 0; box-sizing: border-box; padding: 6px 8px; border: 1.5px solid var(--border-secondary); border-radius: 8px; font-size: 13px; color: var(--text-primary); background: var(--bg-secondary); outline: none; font-variant-numeric: tabular-nums; text-align: center; }
 .period-edit-item__input:focus { border-color: var(--accent); }
 .period-edit-item__sep { color: var(--text-placeholder); font-size: 14px; }
 

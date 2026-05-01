@@ -4,15 +4,68 @@ export const DEFAULT_PERIODS = [
   { period: 2,  start: '08:55', end: '09:40' },
   { period: 3,  start: '10:00', end: '10:45' },
   { period: 4,  start: '10:55', end: '11:40' },
-  { period: 5,  start: '14:00', end: '14:45' },
-  { period: 6,  start: '14:55', end: '15:40' },
-  { period: 7,  start: '16:00', end: '16:45' },
-  { period: 8,  start: '16:55', end: '17:40' },
-  { period: 9,  start: '19:00', end: '19:45' },
-  { period: 10, start: '19:55', end: '20:40' },
-  { period: 11, start: '20:50', end: '21:35' },
-  { period: 12, start: '21:45', end: '22:30' }
+  { period: 5,  start: '11:50', end: '12:35' },
+  { period: 6,  start: '12:45', end: '13:30' },
+  { period: 7,  start: '14:00', end: '14:45' },
+  { period: 8,  start: '14:55', end: '15:40' },
+  { period: 9,  start: '16:00', end: '16:45' },
+  { period: 10, start: '16:55', end: '17:40' },
+  { period: 11, start: '19:00', end: '19:45' },
+  { period: 12, start: '19:55', end: '20:40' },
+  { period: 13, start: '20:50', end: '21:35' },
+  { period: 14, start: '21:45', end: '22:30' }
 ]
+
+function timeToMinutes(time) {
+  const [hours, minutes] = time.split(':').map(Number)
+  return hours * 60 + minutes
+}
+
+function minutesToTime(minutes) {
+  const normalized = ((minutes % 1440) + 1440) % 1440
+  const hours = Math.floor(normalized / 60)
+  const mins = normalized % 60
+  return `${String(hours).padStart(2, '0')}:${String(mins).padStart(2, '0')}`
+}
+
+export function createNextPeriod(periods) {
+  const last = periods[periods.length - 1]
+  if (!last) return { period: 1, start: '08:00', end: '08:45' }
+  const start = timeToMinutes(last.end) + 10
+  return {
+    period: last.period + 1,
+    start: minutesToTime(start),
+    end: minutesToTime(start + 45)
+  }
+}
+
+export function renumberPeriods(periods) {
+  return periods.map((period, index) => ({ ...period, period: index + 1 }))
+}
+
+export function groupPeriodsByDayPart(periods) {
+  const groups = [
+    { label: '上午', periods: [] },
+    { label: '午间', periods: [] },
+    { label: '下午', periods: [] },
+    { label: '晚上', periods: [] }
+  ]
+
+  periods.forEach(period => {
+    const start = timeToMinutes(period.start)
+    if (start < 12 * 60) {
+      groups[0].periods.push(period)
+    } else if (start < 14 * 60) {
+      groups[1].periods.push(period)
+    } else if (start < 18 * 60) {
+      groups[2].periods.push(period)
+    } else {
+      groups[3].periods.push(period)
+    }
+  })
+
+  return groups.filter(group => group.periods.length > 0)
+}
 
 // 星期标签
 export const WEEK_DAYS = ['周一', '周二', '周三', '周四', '周五', '周六', '周日']
