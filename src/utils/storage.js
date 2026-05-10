@@ -2,6 +2,7 @@ const STORAGE_KEY = 'timetable_data'
 const HISTORY_KEY = 'timetable_history'
 const PERIODS_KEY = 'timetable_periods'
 const SEMESTER_START_KEY = 'timetable_semester_start'
+const DEFAULT_PERIOD_DURATION_KEY = 'timetable_default_period_duration'
 const CELL_HEIGHT_KEY = 'timetable_cell_height'
 export const COURSES_CHANGED_EVENT = 'yunke:courses-changed'
 export const PERIODS_CHANGED_EVENT = 'yunke:periods-changed'
@@ -21,12 +22,33 @@ const LEGACY_DEFAULT_PERIODS = [
   { period: 12, start: '21:45', end: '22:30' }
 ]
 
-function isLegacyDefaultPeriods(periods) {
-  if (!Array.isArray(periods) || periods.length !== LEGACY_DEFAULT_PERIODS.length) return false
+const LEGACY_NOON_PERIODS = [
+  { period: 1, start: '08:00', end: '08:45' },
+  { period: 2, start: '08:55', end: '09:40' },
+  { period: 3, start: '10:00', end: '10:45' },
+  { period: 4, start: '10:55', end: '11:40' },
+  { period: 5, start: '11:50', end: '12:35' },
+  { period: 6, start: '12:45', end: '13:30' },
+  { period: 7, start: '14:00', end: '14:45' },
+  { period: 8, start: '14:55', end: '15:40' },
+  { period: 9, start: '16:00', end: '16:45' },
+  { period: 10, start: '16:55', end: '17:40' },
+  { period: 11, start: '19:00', end: '19:45' },
+  { period: 12, start: '19:55', end: '20:40' },
+  { period: 13, start: '20:50', end: '21:35' },
+  { period: 14, start: '21:45', end: '22:30' }
+]
+
+function matchesPeriodPreset(periods, preset) {
+  if (!Array.isArray(periods) || periods.length !== preset.length) return false
   return periods.every((period, index) => {
-    const legacy = LEGACY_DEFAULT_PERIODS[index]
-    return period.period === legacy.period && period.start === legacy.start && period.end === legacy.end
+    const presetPeriod = preset[index]
+    return period.period === presetPeriod.period && period.start === presetPeriod.start && period.end === presetPeriod.end
   })
+}
+
+function isLegacyDefaultPeriods(periods) {
+  return matchesPeriodPreset(periods, LEGACY_DEFAULT_PERIODS) || matchesPeriodPreset(periods, LEGACY_NOON_PERIODS)
 }
 
 // ========== 课程数据 ==========
@@ -162,6 +184,18 @@ export function loadSemesterStart() {
 
 export function saveSemesterStart(dateStr) {
   localStorage.setItem(SEMESTER_START_KEY, dateStr)
+}
+
+export function loadDefaultPeriodDuration() {
+  const val = localStorage.getItem(DEFAULT_PERIOD_DURATION_KEY)
+  const duration = val ? parseInt(val) : 45
+  return Number.isFinite(duration) ? Math.max(20, Math.min(180, duration)) : 45
+}
+
+export function saveDefaultPeriodDuration(duration) {
+  const parsed = parseInt(duration)
+  const normalized = Number.isFinite(parsed) ? Math.max(20, Math.min(180, parsed)) : 45
+  localStorage.setItem(DEFAULT_PERIOD_DURATION_KEY, String(normalized))
 }
 
 // ========== 单元格高度 ==========

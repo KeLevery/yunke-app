@@ -6,7 +6,7 @@ import FluidCloud from './components/FluidCloud.vue'
 
 const { toggleDarkMode } = useTheme()
 const router = useRouter()
-const transitionName = ref('slide-right')
+const transitionName = ref('fade-scale')
 
 router.beforeEach((to, from) => {
   const toDepth = to.meta.depth ?? 0
@@ -17,9 +17,9 @@ router.beforeEach((to, from) => {
 
 <template>
   <FluidCloud />
-  <router-view v-slot="{ Component }">
-    <Transition :name="transitionName" mode="out-in">
-      <component :is="Component" @toggle-dark="toggleDarkMode" />
+  <router-view v-slot="{ Component, route }">
+    <Transition :name="transitionName" appear>
+      <component :is="Component" :key="route.fullPath" @toggle-dark="toggleDarkMode" />
     </Transition>
   </router-view>
 </template>
@@ -28,6 +28,8 @@ router.beforeEach((to, from) => {
 /* ========== 主题变量 ========== */
 :root,
 [data-theme="light"] {
+  --ease-route-enter: cubic-bezier(0.19, 1, 0.22, 1);
+  --ease-route-leave: cubic-bezier(0.22, 1, 0.36, 1);
   --bg-primary: #f5f7fb;
   --bg-secondary: #ffffff;
   --bg-tertiary: #f0f4f8;
@@ -156,52 +158,57 @@ select {
 
 /* ========== 方向感知页面切换动画 ========== */
 
-/* 前进 → 新页面从右侧滑入 */
-.slide-right-enter-active {
-  transition: transform 0.35s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.3s ease;
+/* 轻微位移 + 交叉淡入，避免子页面切换时横向冲击过强 */
+.slide-right-enter-active,
+.slide-left-enter-active,
+.fade-scale-enter-active {
+  position: relative;
+  z-index: 2;
+  transition:
+    transform 0.48s var(--ease-route-enter),
+    opacity 0.44s ease-out;
+  will-change: transform, opacity;
 }
-.slide-right-leave-active {
-  transition: transform 0.28s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.2s ease;
+
+.slide-right-leave-active,
+.slide-left-leave-active,
+.fade-scale-leave-active {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  z-index: 1;
+  pointer-events: none;
+  transition:
+    transform 0.36s var(--ease-route-leave),
+    opacity 0.3s ease-out;
+  will-change: transform, opacity;
 }
+
 .slide-right-enter-from {
   opacity: 0;
-  transform: translateX(60px) scale(0.97);
+  transform: translate3d(14px, 0, 0);
 }
 .slide-right-leave-to {
   opacity: 0;
-  transform: translateX(-30px) scale(0.98);
+  transform: translate3d(-6px, 0, 0);
 }
 
-/* 后退 ← 页面从左侧滑入 */
-.slide-left-enter-active {
-  transition: transform 0.35s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.3s ease;
-}
-.slide-left-leave-active {
-  transition: transform 0.28s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.2s ease;
-}
 .slide-left-enter-from {
   opacity: 0;
-  transform: translateX(-60px) scale(0.97);
+  transform: translate3d(-14px, 0, 0);
 }
 .slide-left-leave-to {
   opacity: 0;
-  transform: translateX(30px) scale(0.98);
+  transform: translate3d(6px, 0, 0);
 }
 
-/* 同级切换 — 淡入缩放 */
-.fade-scale-enter-active {
-  transition: transform 0.3s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.25s ease;
-}
-.fade-scale-leave-active {
-  transition: transform 0.22s ease, opacity 0.18s ease;
-}
 .fade-scale-enter-from {
   opacity: 0;
-  transform: scale(0.96);
+  transform: translate3d(0, 5px, 0) scale(0.997);
 }
 .fade-scale-leave-to {
   opacity: 0;
-  transform: scale(1.02);
+  transform: translate3d(0, -3px, 0) scale(1.001);
 }
 
 /* ========== 通用动画工具类 ========== */
@@ -210,7 +217,7 @@ select {
 @keyframes fadeInUp {
   from {
     opacity: 0;
-    transform: translateY(20px);
+    transform: translateY(8px);
   }
   to {
     opacity: 1;
@@ -222,7 +229,7 @@ select {
 @keyframes fadeInScale {
   from {
     opacity: 0;
-    transform: scale(0.92);
+    transform: scale(0.985);
   }
   to {
     opacity: 1;
@@ -233,8 +240,8 @@ select {
 /* 弹性缩放 — 用于按钮点击 */
 @keyframes bouncePress {
   0% { transform: scale(1); }
-  40% { transform: scale(0.92); }
-  70% { transform: scale(1.02); }
+  45% { transform: scale(0.96); }
+  75% { transform: scale(1.005); }
   100% { transform: scale(1); }
 }
 
@@ -260,5 +267,16 @@ select {
 ::-webkit-scrollbar {
   width: 0;
   height: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
 }
 </style>

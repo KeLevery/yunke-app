@@ -5,11 +5,11 @@ export const DEFAULT_PERIODS = [
   { period: 3,  start: '10:00', end: '10:45' },
   { period: 4,  start: '10:55', end: '11:40' },
   { period: 5,  start: '11:50', end: '12:35' },
-  { period: 6,  start: '12:45', end: '13:30' },
-  { period: 7,  start: '14:00', end: '14:45' },
-  { period: 8,  start: '14:55', end: '15:40' },
-  { period: 9,  start: '16:00', end: '16:45' },
-  { period: 10, start: '16:55', end: '17:40' },
+  { period: 6,  start: '13:30', end: '14:15' },
+  { period: 7,  start: '14:25', end: '15:10' },
+  { period: 8,  start: '15:20', end: '16:05' },
+  { period: 9,  start: '16:15', end: '17:00' },
+  { period: 10, start: '17:10', end: '17:55' },
   { period: 11, start: '19:00', end: '19:45' },
   { period: 12, start: '19:55', end: '20:40' },
   { period: 13, start: '20:50', end: '21:35' },
@@ -28,19 +28,54 @@ function minutesToTime(minutes) {
   return `${String(hours).padStart(2, '0')}:${String(mins).padStart(2, '0')}`
 }
 
-export function createNextPeriod(periods) {
+export const DEFAULT_PERIOD_DURATION = 45
+
+export function normalizePeriodDuration(value) {
+  const duration = parseInt(value)
+  if (!Number.isFinite(duration)) return DEFAULT_PERIOD_DURATION
+  return Math.max(20, Math.min(180, duration))
+}
+
+function getDefaultGapBeforePeriod(periodNumber) {
+  const previousDefault = DEFAULT_PERIODS[periodNumber - 2]
+  const currentDefault = DEFAULT_PERIODS[periodNumber - 1]
+  if (!previousDefault || !currentDefault) return 10
+  return Math.max(0, timeToMinutes(currentDefault.start) - timeToMinutes(previousDefault.end))
+}
+
+export function createNextPeriod(periods, durationMinutes = DEFAULT_PERIOD_DURATION) {
   const last = periods[periods.length - 1]
   if (!last) return { period: 1, start: '08:00', end: '08:45' }
-  const start = timeToMinutes(last.end) + 10
+  const duration = normalizePeriodDuration(durationMinutes)
+  const start = timeToMinutes(last.end) + getDefaultGapBeforePeriod(last.period + 1)
   return {
     period: last.period + 1,
     start: minutesToTime(start),
-    end: minutesToTime(start + 45)
+    end: minutesToTime(start + duration)
   }
 }
 
 export function renumberPeriods(periods) {
   return periods.map((period, index) => ({ ...period, period: index + 1 }))
+}
+
+export function applyPeriodDuration(periods, durationMinutes = DEFAULT_PERIOD_DURATION) {
+  const duration = normalizePeriodDuration(durationMinutes)
+  const source = periods.length > 0 ? renumberPeriods(periods) : DEFAULT_PERIODS
+  let start = timeToMinutes(source[0]?.start || DEFAULT_PERIODS[0].start)
+
+  return source.map((period, index) => {
+    const end = start + duration
+    const nextStart = end + getDefaultGapBeforePeriod(index + 2)
+    const updated = {
+      ...period,
+      period: index + 1,
+      start: minutesToTime(start),
+      end: minutesToTime(end)
+    }
+    start = nextStart
+    return updated
+  })
 }
 
 export function groupPeriodsByDayPart(periods) {

@@ -2,8 +2,8 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { Capacitor } from '@capacitor/core'
-import { loadPeriods, savePeriods, loadSemesterStart, saveSemesterStart, loadCourses, saveCourses, loadCellHeight, saveCellHeight } from '../utils/storage'
-import { DEFAULT_PERIODS, createNextPeriod, renumberPeriods } from '../utils/schedule'
+import { loadPeriods, savePeriods, loadSemesterStart, saveSemesterStart, loadDefaultPeriodDuration, saveDefaultPeriodDuration, loadCourses, saveCourses, loadCellHeight, saveCellHeight } from '../utils/storage'
+import { DEFAULT_PERIODS, DEFAULT_PERIOD_DURATION, applyPeriodDuration, createNextPeriod, normalizePeriodDuration, renumberPeriods } from '../utils/schedule'
 import {
   isNotificationEnabled,
   setNotificationEnabled,
@@ -16,6 +16,8 @@ import {
 const router = useRouter()
 const periods = ref([...DEFAULT_PERIODS])
 const semesterStart = ref('')
+const defaultPeriodDuration = ref(DEFAULT_PERIOD_DURATION)
+const initialDefaultPeriodDuration = ref(DEFAULT_PERIOD_DURATION)
 const notificationEnabled = ref(false)
 const notificationMinutes = ref(20)
 const notificationPermissionGranted = ref(false)
@@ -30,6 +32,8 @@ onMounted(() => {
     periods.value = custom
   }
   semesterStart.value = loadSemesterStart()
+  defaultPeriodDuration.value = loadDefaultPeriodDuration()
+  initialDefaultPeriodDuration.value = defaultPeriodDuration.value
   notificationEnabled.value = isNotificationEnabled()
   notificationMinutes.value = getNotificationMinutes()
   const savedCellHeight = loadCellHeight()
@@ -46,7 +50,7 @@ function updatePeriodTime(index, field, value) {
 }
 
 function addPeriod() {
-  periods.value = [...periods.value, createNextPeriod(periods.value)]
+  periods.value = [...periods.value, createNextPeriod(periods.value, defaultPeriodDuration.value)]
 }
 
 function removeLastPeriod() {
@@ -55,13 +59,22 @@ function removeLastPeriod() {
 }
 
 function save() {
-  savePeriods(renumberPeriods(periods.value))
+  defaultPeriodDuration.value = normalizePeriodDuration(defaultPeriodDuration.value)
+  if (defaultPeriodDuration.value !== initialDefaultPeriodDuration.value) {
+    periods.value = applyPeriodDuration(periods.value, defaultPeriodDuration.value)
+  } else {
+    periods.value = renumberPeriods(periods.value)
+  }
+  savePeriods(periods.value)
   saveSemesterStart(semesterStart.value)
+  saveDefaultPeriodDuration(defaultPeriodDuration.value)
+  initialDefaultPeriodDuration.value = defaultPeriodDuration.value
   router.back()
 }
 
 function resetToDefault() {
   periods.value = DEFAULT_PERIODS.map(p => ({ ...p }))
+  defaultPeriodDuration.value = DEFAULT_PERIOD_DURATION
 }
 
 function goBack() {
@@ -100,6 +113,7 @@ function updateCellHeight(val) {
 const showExportModal = ref(false)
 const exportCode = ref('')
 const copySuccess = ref(false)
+const showClearConfirm = ref(false)
 
 const WEEK_NAMES = ['周一', '周二', '周三', '周四', '周五', '周六', '周日']
 
@@ -307,6 +321,15 @@ function cancelImport() {
   showImportConfirm.value = false
   importData.value = null
 }
+
+function openClearConfirm() {
+  showClearConfirm.value = true
+}
+
+function clearTimetable() {
+  saveCourses([])
+  showClearConfirm.value = false
+}
 </script>
 
 <template>
@@ -384,6 +407,14 @@ function cancelImport() {
             </div>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text-tertiary)" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
           </button>
+          <div class="settings__divider"></div>
+          <button class="settings__action-btn settings__action-btn--danger" @click="openClearConfirm">
+            <div class="settings__action-info">
+              <span class="settings__field-label">清空课表</span>
+              <span class="settings__field-desc">删除当前所有课程，节次和学期设置会保留</span>
+            </div>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--danger)" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+          </button>
         </div>
       </div>
 
@@ -405,6 +436,25 @@ function cancelImport() {
               <span class="settings__field-desc">设置第一周第一天的日期（周一），影响周次计算</span>
             </div>
             <input v-model="semesterStart" class="settings__date-input" type="date" />
+          </div>
+          <div class="settings__divider"></div>
+          <div class="settings__field">
+            <div class="settings__field-info">
+              <span class="settings__field-label">默认课时时长</span>
+              <span class="settings__field-desc">用于自动新增节次，已设置的节次时间不会被改动</span>
+            </div>
+            <label class="settings__duration-input">
+              <input
+                v-model.number="defaultPeriodDuration"
+                class="settings__number-input"
+                type="number"
+                min="20"
+                max="180"
+                step="5"
+                inputmode="numeric"
+              />
+              <span>分钟</span>
+            </label>
           </div>
         </div>
       </div>
@@ -548,6 +598,22 @@ function cancelImport() {
         </div>
       </div>
     </Transition>
+
+    <!-- 清空课表确认弹窗 -->
+    <Transition name="modal">
+      <div v-if="showClearConfirm" class="modal-overlay" @click.self="showClearConfirm = false">
+        <div class="modal">
+          <div class="modal__title">清空课表</div>
+          <div class="modal__text">
+            确定要删除当前所有课程吗？这个操作不会删除节次时间、学期设置和提醒设置。
+          </div>
+          <div class="modal__actions">
+            <button class="modal__btn modal__btn--cancel" @click="showClearConfirm = false">取消</button>
+            <button class="modal__btn modal__btn--danger" @click="clearTimetable">清空</button>
+          </div>
+        </div>
+      </div>
+    </Transition>
   </div>
 </template>
 
@@ -675,6 +741,35 @@ function cancelImport() {
 }
 
 .settings__date-input:focus {
+  border-color: var(--accent);
+}
+
+.settings__duration-input {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 10px 0 0;
+  border: 1.5px solid var(--border-secondary);
+  border-radius: 10px;
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+  font-size: 13px;
+  flex-shrink: 0;
+  overflow: hidden;
+}
+
+.settings__number-input {
+  width: 76px;
+  padding: 8px 4px 8px 12px;
+  border: none;
+  background: transparent;
+  color: var(--text-primary);
+  font-size: 14px;
+  outline: none;
+  font-variant-numeric: tabular-nums;
+}
+
+.settings__duration-input:focus-within {
   border-color: var(--accent);
 }
 
@@ -953,6 +1048,14 @@ function cancelImport() {
 
 .settings__action-btn:active {
   background: var(--bg-tertiary);
+}
+
+.settings__action-btn--danger .settings__field-label {
+  color: var(--danger);
+}
+
+.settings__action-btn--danger:active {
+  background: var(--danger-bg);
 }
 
 .settings__action-info {

@@ -1,8 +1,8 @@
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
-import { addCourse, updateCourse, getCourseById, deleteCourse, getHistory, addHistoryItem, loadPeriods, savePeriods, removeHistoryItem as removeHistoryFromStorage } from '../utils/storage'
-import { WEEK_DAYS, DEFAULT_PERIODS, COURSE_COLORS, createNextPeriod, renumberPeriods } from '../utils/schedule'
+import { addCourse, updateCourse, getCourseById, deleteCourse, getHistory, addHistoryItem, loadPeriods, savePeriods, loadDefaultPeriodDuration, removeHistoryItem as removeHistoryFromStorage } from '../utils/storage'
+import { WEEK_DAYS, DEFAULT_PERIODS, COURSE_COLORS, DEFAULT_PERIOD_DURATION, createNextPeriod, renumberPeriods } from '../utils/schedule'
 
 const router = useRouter()
 const route = useRoute()
@@ -10,6 +10,7 @@ const isEdit = computed(() => route.name === 'CourseEdit')
 const editId = computed(() => route.params.id)
 
 const periods = ref([...DEFAULT_PERIODS])
+const defaultPeriodDuration = ref(DEFAULT_PERIOD_DURATION)
 
 const form = ref({
   name: '',
@@ -31,6 +32,7 @@ const history = ref({
 onMounted(() => {
   const customPeriods = loadPeriods()
   if (customPeriods) periods.value = customPeriods
+  defaultPeriodDuration.value = loadDefaultPeriodDuration()
 
   history.value = {
     name: getHistory('name'),
@@ -89,7 +91,7 @@ function updatePeriodTime(index, field, value) {
 }
 
 function addPeriod() {
-  periods.value = [...periods.value, createNextPeriod(periods.value)]
+  periods.value = [...periods.value, createNextPeriod(periods.value, defaultPeriodDuration.value)]
 }
 
 function removeLastPeriod() {
