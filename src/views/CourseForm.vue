@@ -1,7 +1,7 @@
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
-import { addCourse, updateCourse, getCourseById, deleteCourse, getHistory, addHistoryItem, loadPeriods, savePeriods, loadDefaultPeriodDuration, removeHistoryItem as removeHistoryFromStorage } from '../utils/storage'
+import { addCourse, updateCourse, getCourseById, deleteCourse, getHistory, loadCourses, loadPeriods, savePeriods, loadDefaultPeriodDuration, removeHistoryItem as removeHistoryFromStorage } from '../utils/storage'
 import { WEEK_DAYS, DEFAULT_PERIODS, COURSE_COLORS, DEFAULT_PERIOD_DURATION, createNextPeriod, renumberPeriods } from '../utils/schedule'
 
 const router = useRouter()
@@ -29,15 +29,41 @@ const history = ref({
   teacher: []
 })
 
+const courseProfiles = ref([])
+
+function mergeUnique(...lists) {
+  const seen = new Set()
+  return lists.flat().map(item => (item || '').trim()).filter(item => {
+    if (!item || seen.has(item)) return false
+    seen.add(item)
+    return true
+  })
+}
+
+function buildCourseProfiles(courses) {
+  const seen = new Set()
+  return [...courses].reverse().map(course => ({
+    name: (course.name || '').trim(),
+    location: (course.location || '').trim(),
+    teacher: (course.teacher || '').trim()
+  })).filter(profile => {
+    if (!profile.name || seen.has(profile.name)) return false
+    seen.add(profile.name)
+    return true
+  })
+}
+
 onMounted(() => {
   const customPeriods = loadPeriods()
   if (customPeriods) periods.value = customPeriods
   defaultPeriodDuration.value = loadDefaultPeriodDuration()
+  const savedCourses = loadCourses() || []
+  courseProfiles.value = buildCourseProfiles(savedCourses)
 
   history.value = {
-    name: getHistory('name'),
-    location: getHistory('location'),
-    teacher: getHistory('teacher')
+    name: mergeUnique(getHistory('name'), savedCourses.map(course => course.name)),
+    location: mergeUnique(getHistory('location'), savedCourses.map(course => course.location)),
+    teacher: mergeUnique(getHistory('teacher'), savedCourses.map(course => course.teacher))
   }
 
   if (route.query.day) form.value.dayOfWeek = parseInt(route.query.day)
@@ -54,6 +80,15 @@ onMounted(() => {
 
 watch(() => form.value.startPeriod, (val) => {
   if (form.value.endPeriod < val) form.value.endPeriod = val
+})
+
+watch(() => form.value.name, (value) => {
+  const keyword = (value || '').trim().toLowerCase()
+  if (!keyword) return
+  const profile = courseProfiles.value.find(item => item.name.toLowerCase() === keyword)
+  if (!profile) return
+  if (!form.value.location && profile.location) form.value.location = profile.location
+  if (!form.value.teacher && profile.teacher) form.value.teacher = profile.teacher
 })
 
 function selectColor(color) { form.value.color = color }
@@ -135,6 +170,7 @@ const isFormValid = computed(() => form.value.weeks.length > 0)
 const showHistoryModal = ref(false)
 const historyField = ref('')
 const historySearch = ref('')
+const focusedHistoryField = ref('')
 const historyFieldLabel = { name: '课程名称', location: '上课地点', teacher: '任课教师' }
 const historyFieldIcon = {
   name: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>',
@@ -151,6 +187,31 @@ function openHistoryPicker(field) {
 function selectHistoryItem(value) {
   form.value[historyField.value] = value
   showHistoryModal.value = false
+}
+
+function focusHistoryField(field) {
+  focusedHistoryField.value = field
+}
+
+function blurHistoryField(field) {
+  window.setTimeout(() => {
+    if (focusedHistoryField.value === field) focusedHistoryField.value = ''
+  }, 120)
+}
+
+function getInlineHistorySuggestions(field) {
+  if (focusedHistoryField.value !== field) return []
+  const list = history.value[field] || []
+  const keyword = (form.value[field] || '').trim().toLowerCase()
+  const suggestions = keyword
+    ? list.filter(item => item.toLowerCase().includes(keyword))
+    : list
+  return suggestions.slice(0, 5)
+}
+
+function applyHistorySuggestion(field, value) {
+  form.value[field] = value
+  focusedHistoryField.value = ''
 }
 
 function removeHistoryItem(type, value) {
@@ -187,10 +248,18 @@ const hasHistory = (field) => (history.value[field] || []).length > 0
       <div class="form-group">
         <label class="form-label">课程名称 <span class="form-optional">选填</span></label>
         <div class="form-input-wrap">
-          <input v-model="form.name" class="form-input" type="text" placeholder="如：高等数学（不填则默认未命名课程）" maxlength="20" />
+          <input v-model="form.name" class="form-input" type="text" placeholder="如：高等数学（不填则默认未命名课程）" maxlength="20" @focus="focusHistoryField('name')" @blur="blurHistoryField('name')" />
           <button v-if="hasHistory('name')" class="form-input__picker" @click="openHistoryPicker('name')">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
           </button>
+          <div v-if="getInlineHistorySuggestions('name').length" class="history-inline">
+            <button
+              v-for="item in getInlineHistorySuggestions('name')"
+              :key="item"
+              class="history-inline__item"
+              @mousedown.prevent="applyHistorySuggestion('name', item)"
+            >{{ item }}</button>
+          </div>
         </div>
       </div>
 
@@ -198,10 +267,18 @@ const hasHistory = (field) => (history.value[field] || []).length > 0
       <div class="form-group">
         <label class="form-label">上课地点 <span class="form-optional">选填</span></label>
         <div class="form-input-wrap">
-          <input v-model="form.location" class="form-input" type="text" placeholder="如：教学楼A-301" maxlength="30" />
+          <input v-model="form.location" class="form-input" type="text" placeholder="如：教学楼A-301" maxlength="30" @focus="focusHistoryField('location')" @blur="blurHistoryField('location')" />
           <button v-if="hasHistory('location')" class="form-input__picker" @click="openHistoryPicker('location')">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
           </button>
+          <div v-if="getInlineHistorySuggestions('location').length" class="history-inline">
+            <button
+              v-for="item in getInlineHistorySuggestions('location')"
+              :key="item"
+              class="history-inline__item"
+              @mousedown.prevent="applyHistorySuggestion('location', item)"
+            >{{ item }}</button>
+          </div>
         </div>
       </div>
 
@@ -209,10 +286,18 @@ const hasHistory = (field) => (history.value[field] || []).length > 0
       <div class="form-group">
         <label class="form-label">任课教师 <span class="form-optional">选填</span></label>
         <div class="form-input-wrap">
-          <input v-model="form.teacher" class="form-input" type="text" placeholder="如：张教授" maxlength="20" />
+          <input v-model="form.teacher" class="form-input" type="text" placeholder="如：张教授" maxlength="20" @focus="focusHistoryField('teacher')" @blur="blurHistoryField('teacher')" />
           <button v-if="hasHistory('teacher')" class="form-input__picker" @click="openHistoryPicker('teacher')">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
           </button>
+          <div v-if="getInlineHistorySuggestions('teacher').length" class="history-inline">
+            <button
+              v-for="item in getInlineHistorySuggestions('teacher')"
+              :key="item"
+              class="history-inline__item"
+              @mousedown.prevent="applyHistorySuggestion('teacher', item)"
+            >{{ item }}</button>
+          </div>
         </div>
       </div>
 
@@ -556,6 +641,42 @@ const hasHistory = (field) => (history.value[field] || []).length > 0
 
 .form-input__picker:active {
   background: var(--bg-hover);
+}
+
+.history-inline {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: calc(100% + 6px);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px;
+  border: 1px solid var(--border-secondary);
+  border-radius: 12px;
+  background: var(--modal-bg);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.12);
+  z-index: 20;
+}
+
+.history-inline__item {
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-primary);
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  padding: 9px 10px;
+  text-align: left;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.history-inline__item:active {
+  background: var(--accent-light);
+  color: var(--accent);
 }
 
 .day-selector { display: flex; gap: 5px; }

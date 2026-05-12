@@ -43,11 +43,25 @@ function getDefaultGapBeforePeriod(periodNumber) {
   return Math.max(0, timeToMinutes(currentDefault.start) - timeToMinutes(previousDefault.end))
 }
 
+function getDefaultStartForPeriod(periodNumber) {
+  const currentDefault = DEFAULT_PERIODS[periodNumber - 1]
+  return currentDefault ? timeToMinutes(currentDefault.start) : null
+}
+
+function getNextStartAfterEnd(periodNumber, previousEnd) {
+  const defaultGap = getDefaultGapBeforePeriod(periodNumber)
+  const defaultStart = getDefaultStartForPeriod(periodNumber)
+  if (defaultStart !== null && defaultGap >= 30) {
+    return Math.max(defaultStart, previousEnd + 10)
+  }
+  return previousEnd + defaultGap
+}
+
 export function createNextPeriod(periods, durationMinutes = DEFAULT_PERIOD_DURATION) {
   const last = periods[periods.length - 1]
   if (!last) return { period: 1, start: '08:00', end: '08:45' }
   const duration = normalizePeriodDuration(durationMinutes)
-  const start = timeToMinutes(last.end) + getDefaultGapBeforePeriod(last.period + 1)
+  const start = getNextStartAfterEnd(last.period + 1, timeToMinutes(last.end))
   return {
     period: last.period + 1,
     start: minutesToTime(start),
@@ -66,7 +80,7 @@ export function applyPeriodDuration(periods, durationMinutes = DEFAULT_PERIOD_DU
 
   return source.map((period, index) => {
     const end = start + duration
-    const nextStart = end + getDefaultGapBeforePeriod(index + 2)
+    const nextStart = getNextStartAfterEnd(index + 2, end)
     const updated = {
       ...period,
       period: index + 1,
