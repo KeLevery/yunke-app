@@ -248,10 +248,12 @@ const hasHistory = (field) => (history.value[field] || []).length > 0
       <div class="form-group">
         <label class="form-label">课程名称 <span class="form-optional">选填</span></label>
         <div class="form-input-wrap">
-          <input v-model="form.name" class="form-input" type="text" placeholder="如：高等数学（不填则默认未命名课程）" maxlength="20" @focus="focusHistoryField('name')" @blur="blurHistoryField('name')" />
-          <button v-if="hasHistory('name')" class="form-input__picker" @click="openHistoryPicker('name')">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
-          </button>
+          <div class="form-input-shell">
+            <input v-model="form.name" class="form-input" type="text" placeholder="如：高等数学（不填则默认未命名课程）" maxlength="20" @focus="focusHistoryField('name')" @blur="blurHistoryField('name')" />
+            <button v-if="hasHistory('name')" class="form-input__picker" @click="openHistoryPicker('name')">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+            </button>
+          </div>
           <div v-if="getInlineHistorySuggestions('name').length" class="history-inline">
             <button
               v-for="item in getInlineHistorySuggestions('name')"
@@ -267,10 +269,12 @@ const hasHistory = (field) => (history.value[field] || []).length > 0
       <div class="form-group">
         <label class="form-label">上课地点 <span class="form-optional">选填</span></label>
         <div class="form-input-wrap">
-          <input v-model="form.location" class="form-input" type="text" placeholder="如：教学楼A-301" maxlength="30" @focus="focusHistoryField('location')" @blur="blurHistoryField('location')" />
-          <button v-if="hasHistory('location')" class="form-input__picker" @click="openHistoryPicker('location')">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
-          </button>
+          <div class="form-input-shell">
+            <input v-model="form.location" class="form-input" type="text" placeholder="如：教学楼A-301" maxlength="30" @focus="focusHistoryField('location')" @blur="blurHistoryField('location')" />
+            <button v-if="hasHistory('location')" class="form-input__picker" @click="openHistoryPicker('location')">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+            </button>
+          </div>
           <div v-if="getInlineHistorySuggestions('location').length" class="history-inline">
             <button
               v-for="item in getInlineHistorySuggestions('location')"
@@ -286,10 +290,12 @@ const hasHistory = (field) => (history.value[field] || []).length > 0
       <div class="form-group">
         <label class="form-label">任课教师 <span class="form-optional">选填</span></label>
         <div class="form-input-wrap">
-          <input v-model="form.teacher" class="form-input" type="text" placeholder="如：张教授" maxlength="20" @focus="focusHistoryField('teacher')" @blur="blurHistoryField('teacher')" />
-          <button v-if="hasHistory('teacher')" class="form-input__picker" @click="openHistoryPicker('teacher')">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
-          </button>
+          <div class="form-input-shell">
+            <input v-model="form.teacher" class="form-input" type="text" placeholder="如：张教授" maxlength="20" @focus="focusHistoryField('teacher')" @blur="blurHistoryField('teacher')" />
+            <button v-if="hasHistory('teacher')" class="form-input__picker" @click="openHistoryPicker('teacher')">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+            </button>
+          </div>
           <div v-if="getInlineHistorySuggestions('teacher').length" class="history-inline">
             <button
               v-for="item in getInlineHistorySuggestions('teacher')"
@@ -598,7 +604,15 @@ const hasHistory = (field) => (history.value[field] || []).length > 0
 .form-input-wrap {
   position: relative;
   display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.form-input-shell {
+  position: relative;
+  display: flex;
   align-items: center;
+  width: 100%;
 }
 
 .form-input {
@@ -644,19 +658,19 @@ const hasHistory = (field) => (history.value[field] || []).length > 0
 }
 
 .history-inline {
-  position: absolute;
-  left: 0;
-  right: 0;
-  top: calc(100% + 6px);
   display: flex;
   flex-direction: column;
   gap: 2px;
   padding: 6px;
   border: 1px solid var(--border-secondary);
   border-radius: 12px;
-  background: var(--modal-bg);
-  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.12);
-  z-index: 20;
+  background: var(--bg-secondary);
+  box-shadow: inset 0 0 0 1px rgba(74, 144, 217, 0.05);
+  max-height: 172px;
+  overflow-y: auto;
+  width: 100%;
+  box-sizing: border-box;
+  -webkit-overflow-scrolling: touch;
 }
 
 .history-inline__item {
