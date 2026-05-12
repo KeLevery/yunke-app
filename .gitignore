@@ -47,5 +47,10 @@ Thumbs.db
 # 测试/调试文件
 _test_*.py
 
+# 截图/视觉回归临时产物
+homepage*.png
+home-*-after*.png
+settings-*-after*.png
+
 # 个人课表 PDF（含姓名隐私）
 *.pdf
